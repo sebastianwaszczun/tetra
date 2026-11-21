@@ -16,6 +16,9 @@ from pydantic import BaseModel, Field
 
 from fakecollector.features import av as av_module
 from fakecollector.features import text as text_module
+from fakecollector import graph as graph_module
+from fakecollector import grouping as grouping_module
+from fakecollector import record as record_module
 from fakecollector.ingest import ingest_upload, run_osint
 
 app = FastAPI(
@@ -170,11 +173,13 @@ def analyze(
     asr: bool = Form(True, description="Czy robić transkrypcję mowy (najwolniejsza część, ~1 min na film)."),
     image: bool = Form(True, description="Moduł obrazu: zrzuty, obrazy ze strony i klatki wideo "
                                          "(hashe, wygląd, logo, twarze lektora/celebryty, QR)."),
+    save: bool = Form(True, description="Czy zapisać rekord materiału w bazie i poszukać podobnych."),
+    group: bool = Form(True, description="Czy przypisać materiał do kampanii (wymaga save)."),
 ) -> dict[str, Any]:
-    """Preprocessing: rozkłada materiał na składniki i mówi, który moduł co dostaje.
+    """Preprocessing -> moduły (AV, tekst, OSINT, obraz) -> rekord -> zapis -> kandydaci -> kampania.
 
     Zwraca też pola starego stuba (`text`, `files_count`, `files`), żeby front działał bez zmian.
-    Funkcja jest synchroniczna – FastAPI uruchamia ją w osobnym wątku (Playwright i OCR blokują).
+    Funkcja jest synchroniczna – FastAPI uruchamia ją w osobnym wątku (Playwright, OCR i modele blokują).
     """
     text = (text or "").strip() or None
     if not text and not files:
@@ -190,38 +195,167 @@ def analyze(
         payload.append((f.filename or "plik", data))
 
     inc = ingest_upload(text=text, files=payload, fetch=fetch)
+    out = record_module.process_incident(inc, save=save, text=text_features, osint=osint, enrich=True,
+                                         av=av, asr=asr, image=image)
+    res, rec = out["_results"], out["_record"]
     result: dict[str, Any] = {
         "text": text is not None,
         "files_count": len(received),
         "files": received,
+        "material_id": rec.id,
+        "saved": out["saved"],
         "incident": inc.to_dict(with_text=False),
         "routes": inc.routes(),
+        "modules": rec.summary["modules"],
         "text_preview": inc.text[:1000],
+        "candidates": out["candidates"],            # podobne materiały z bazy (wejście dla grupowania)
     }
-    if av and inc.for_module("av"):
-        try:
-            av_feats = av_module.extract(inc, asr=asr)
-            av_module.attach_to_incident(inc, av_feats)   # transkrypcja -> tekst materiału
-            result["av_features"] = av_module.to_dict(av_feats, with_vectors=False)
-            result["incident"] = inc.to_dict(with_text=False)
-            result["text_preview"] = inc.text[:1000]
-        except Exception as exc:  # awaria modułu AV nie może zabrać reszty wyniku
-            result["av_features"] = None
-            result["av_error"] = f"{exc.__class__.__name__}: {exc}"
-    if image and inc.for_module("image"):
-        try:
-            result["image_features"] = _image_module().extract(inc)
-        except Exception as exc:
-            result["image_features"] = None
-            result["image_error"] = f"{exc.__class__.__name__}: {exc}"
-    if text_features and inc.text.strip():
-        origin = inc.text_origin[0] if inc.text_origin else "html"
-        feats = text_module.analyze_text(inc.text, origin=origin, title=inc.title)
-        result["text_features"] = feats.to_dict(with_vectors=False)   # wektory idą do bazy, nie do frontu
+    if out.get("record_error"):
+        result["record_error"] = out["record_error"]
+    for name, key in (("text", "text_features"), ("av", "av_features"), ("image", "image_features")):
+        data = getattr(res, name)
+        if data is not None:
+            result[key] = record_module.strip_vectors(data)       # wektory idą do bazy, nie do frontu
+        if name in res.errors:
+            result[key] = None
+            result[f"{name}_error"] = res.errors[name]
     if osint:
+        result["osint"] = res.osint
+        if "osint" in res.errors:
+            result["osint_error"] = res.errors["osint"]
+    if save and group and out["saved"]:
         try:
-            result["osint"] = run_osint(inc, enrich=True)
-        except Exception as exc:
-            result["osint"] = None
-            result["osint_error"] = f"{exc.__class__.__name__}: {exc}"
+            # kampania: przypisany / do_weryfikacji / nowy_wzorzec + przesłanki
+            result["assignment"] = grouping_module.assign_material(rec.id)
+        except Exception as exc:  # noqa: BLE001 – błąd grupowania nie może zabrać wyniku analizy
+            result["assignment"] = None
+            result["assignment_error"] = f"{exc.__class__.__name__}: {exc}"
     return result
+
+
+# ----------------------------------------------------------------------------- rekordy materiałów
+
+@app.get("/materials", tags=["rekord materiału"], summary="Lista zapisanych materiałów")
+def materials(limit: int = 100, offset: int = 0) -> dict[str, Any]:
+    try:
+        return {"count": record_module.count_materials(),
+                "items": record_module.list_materials(limit=limit, offset=offset)}
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
+
+
+@app.get("/materials/{material_id}", tags=["rekord materiału"], summary="Rekord materiału (bez wektorów)")
+def material(material_id: str) -> dict[str, Any]:
+    rec = record_module.load_record(material_id)
+    if rec is None:
+        raise HTTPException(404, "Nie ma takiego materiału.")
+    return record_module.front_view(rec)
+
+
+@app.get("/materials/{material_id}/candidates", tags=["rekord materiału"],
+         summary="Podobne materiały z bazy i powody trafienia")
+def material_candidates(material_id: str, limit: int = 20) -> dict[str, Any]:
+    if record_module.load_summary(material_id) is None:
+        raise HTTPException(404, "Nie ma takiego materiału.")
+    return {"material_id": material_id, "candidates": record_module.find_candidates(material_id, limit=limit)}
+
+
+@app.delete("/materials/{material_id}", tags=["rekord materiału"], summary="Usunięcie materiału z bazy")
+def material_delete(material_id: str) -> dict[str, Any]:
+    if not record_module.delete_material(material_id):
+        raise HTTPException(404, "Nie ma takiego materiału.")
+    return {"deleted": material_id}
+
+
+# ----------------------------------------------------------------------------- kampanie
+
+@app.get("/campaigns", tags=["kampanie"], summary="Lista kampanii")
+def campaigns(min_size: int = 1) -> dict[str, Any]:
+    try:
+        items = grouping_module.list_campaigns(min_size=min_size)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
+    return {"count": len(items), "items": items}
+
+
+@app.get("/campaigns/{campaign_id}", tags=["kampanie"], summary="Kampania: materiały, powiązania, przesłanki")
+def campaign(campaign_id: int) -> dict[str, Any]:
+    c = grouping_module.get_campaign(campaign_id)
+    if c is None:
+        raise HTTPException(404, "Nie ma takiej kampanii.")
+    return c
+
+
+@app.post("/campaigns/rebuild", tags=["kampanie"], summary="Przeliczenie kampanii dla całej bazy")
+def campaigns_rebuild(dry_run: bool = False) -> dict[str, Any]:
+    """Porównuje materiały z kandydatami i składa kampanie od nowa. Dla kilkudziesięciu materiałów
+    trwa kilka minut (porównanie obrazów i nagrań). Po zapisie odświeża kopię grafu w Neo4j."""
+    result = grouping_module.rebuild(write=not dry_run)
+    if not dry_run:
+        try:
+            result["neo4j"] = graph_module.sync_neo4j()
+        except Exception as exc:  # noqa: BLE001 – Neo4j to tylko kopia do podglądu
+            result["neo4j_error"] = f"{exc.__class__.__name__}: {exc}"
+    return result
+
+
+@app.post("/materials/{material_id}/assign", tags=["kampanie"], summary="Przypisanie materiału do kampanii")
+def material_assign(material_id: str) -> dict[str, Any]:
+    if record_module.load_summary(material_id) is None:
+        raise HTTPException(404, "Nie ma takiego materiału.")
+    return grouping_module.assign_material(material_id)
+
+
+@app.get("/compare", tags=["kampanie"], summary="Porównanie dwóch zapisanych materiałów (wszystkie moduły)")
+def compare(a: str, b: str) -> dict[str, Any]:
+    for mid in (a, b):
+        if record_module.load_summary(mid) is None:
+            raise HTTPException(404, f"Nie ma materiału {mid}.")
+    return grouping_module.compare_materials(a, b).to_dict()
+
+
+# ----------------------------------------------------------------------------- graf i statystyki
+
+@app.get("/graph", tags=["graf"], summary="Graf powiązań: węzły i krawędzie (Cytoscape / vis-network)")
+def graph(campaign_id: Optional[int] = None, operator: Optional[int] = None, material_id: Optional[str] = None,
+          entities: bool = True, shared_only: bool = True, min_score: float = 0.5) -> dict[str, Any]:
+    """Cały graf albo wycinek: `campaign_id` (jedna kampania), `operator` (kampanie operatora),
+    `material_id` (otoczenie materiału).
+
+    Węzły: operator, campaign, material, domain, person, account, kit, infra (pole `type`).
+    Krawędzie: w_kampanii, operator, ta_sama_kampania, do_weryfikacji, ten_sam_operator, uzywa,
+    wymienia, pokazuje (pole `type`); przesłanki w `data.reasons`. Opis typów w polu `legend`.
+    `shared_only=true` pokazuje tylko ślady wspólne dla co najmniej dwóch materiałów (czytelniejszy graf).
+    """
+    try:
+        return graph_module.build_graph(campaign_id=campaign_id, operator_group=operator, material_id=material_id,
+                                        entities=entities, shared_only=shared_only, min_score=min_score)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
+
+
+@app.post("/graph/sync", tags=["graf"], summary="Kopia grafu w Neo4j (podgląd: http://localhost:7474)")
+def graph_sync() -> dict[str, Any]:
+    try:
+        return graph_module.sync_neo4j()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, f"Neo4j niedostępny: {exc.__class__.__name__}: {exc}") from exc
+
+
+@app.get("/stats", tags=["graf"], summary="Liczby do pulpitu: materiały, kampanie, operatorzy, do weryfikacji")
+def stats() -> dict[str, Any]:
+    from fakecollector.grouping.campaigns import connect
+    try:
+        with connect() as conn:
+            row = conn.execute(
+                """SELECT (SELECT count(*) FROM materials),
+                          (SELECT count(*) FROM campaigns WHERE size >= 2),
+                          (SELECT count(*) FROM campaigns WHERE size = 1),
+                          (SELECT count(DISTINCT operator_group) FROM campaigns WHERE operator_group IS NOT NULL),
+                          (SELECT count(*) FROM materials WHERE assignment = 'do_weryfikacji'),
+                          (SELECT count(*) FROM materials WHERE campaign_id IS NULL),
+                          (SELECT count(DISTINCT domain) FROM materials WHERE domain IS NOT NULL)""").fetchone()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
+    keys = ("materials", "campaigns", "single_material_campaigns", "operators", "to_review", "unassigned", "domains")
+    return dict(zip(keys, row))

@@ -15,6 +15,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from fakecollector.features import av as av_module
 from fakecollector.features import text as text_module
 from fakecollector.ingest import ingest_upload, run_osint
 
@@ -49,6 +50,33 @@ class TextAnalyzeResponse(BaseModel):
     features: dict[str, Any] = Field(description="Cechy tekstu z modułu tekstu (opis pól w TEXT.md).")
     page: Optional[dict[str, Any]] = Field(
         None, description="Metadane strony: tytuł, opis, nagłówki, linki wychodzące (tylko dla pola html).")
+
+
+class AVCompareRequest(BaseModel):
+    a: str = Field(description="Ścieżka do pliku albo folderu w kontenerze, np. data/DANE/5")
+    b: str = Field(description="Druga ścieżka")
+    asr: bool = Field(False, description="Czy robić transkrypcję (wolne).")
+
+
+@app.post("/av/compare", tags=["moduł audio i wideo"], summary="Porównanie dwóch nagrań (głos, dźwięk, obraz)")
+def av_compare(req: AVCompareRequest) -> dict[str, Any]:
+    """Do testów: porównuje dwa pliki albo foldery z danymi zamontowanymi w kontenerze."""
+    from pathlib import Path
+    feats = []
+    data_root = Path(os.environ.get("DATA_DIR", "data")).resolve()
+    for p in (req.a, req.b):
+        path = Path(p).resolve()
+        if not path.is_relative_to(data_root):   # tylko dane projektu, nie dowolne pliki kontenera
+            raise HTTPException(400, f"Ścieżka musi być w folderze {data_root}")
+        if not path.exists():
+            raise HTTPException(404, f"Nie ma takiej ścieżki: {p}")
+        f = av_module.analyze_path(path, asr=req.asr)
+        if not f:
+            raise HTTPException(422, f"Brak plików wideo/audio w {p}")
+        feats.append(f)
+    return {"compare": av_module.compare(*feats),
+            "a": av_module.to_dict(feats[0], with_vectors=False),
+            "b": av_module.to_dict(feats[1], with_vectors=False)}
 
 
 @app.post("/text/analyze", response_model=TextAnalyzeResponse, tags=["moduł tekstu"],
@@ -89,6 +117,8 @@ def analyze(
     text_features: bool = Form(True, description="Czy od razu policzyć cechy tekstu."),
     osint: bool = Form(True, description="Moduł OSINT z pełnym wzbogacaniem (DNS, RDAP/WHOIS, ASN, TLS, crt.sh). "
                                          "Wydłuża odpowiedź o kilka–kilkanaście sekund."),
+    av: bool = Form(True, description="Czy analizować wideo i audio (głos, dźwięk, obraz, napisy)."),
+    asr: bool = Form(True, description="Czy robić transkrypcję mowy (najwolniejsza część, ~1 min na film)."),
 ) -> dict[str, Any]:
     """Preprocessing: rozkłada materiał na składniki i mówi, który moduł co dostaje.
 
@@ -117,8 +147,20 @@ def analyze(
         "routes": inc.routes(),
         "text_preview": inc.text[:1000],
     }
+    if av and inc.for_module("av"):
+        try:
+            av_feats = av_module.extract(inc, asr=asr)
+            av_module.attach_to_incident(inc, av_feats)   # transkrypcja -> tekst materiału
+            result["av_features"] = av_module.to_dict(av_feats, with_vectors=False)
+            result["incident"] = inc.to_dict(with_text=False)
+            result["text_preview"] = inc.text[:1000]
+        except Exception as exc:  # awaria modułu AV nie może zabrać reszty wyniku
+            result["av_features"] = None
+            result["av_error"] = f"{exc.__class__.__name__}: {exc}"
     if text_features and inc.text.strip():
-        result["text_features"] = text_module.extract(inc)
+        origin = inc.text_origin[0] if inc.text_origin else "html"
+        feats = text_module.analyze_text(inc.text, origin=origin, title=inc.title)
+        result["text_features"] = feats.to_dict(with_vectors=False)   # wektory idą do bazy, nie do frontu
     if osint:
         try:
             result["osint"] = run_osint(inc, enrich=True)

@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 STORE_ROOT = Path(os.environ.get("STORE_DIR", "data/store"))
 
 # Pierwszeństwo źródeł tekstu dla modułu tekstu (od najlepszego)
-TEXT_PRIORITY = ["input", "html", "page_text", "har", "adlib", "json", "ocr", "transcript"]
+TEXT_PRIORITY = ["input", "html", "page_text", "har", "adlib", "json", "transcript", "ocr"]
 
 ERROR_PAGE_RE = re.compile(
     r"bad gateway|error code \d{3}|\b50[234]\b[^\n]{0,40}(?:error|gateway|unavailable)|"
@@ -264,6 +264,11 @@ def _json(inc: Incident, value: str | Path, o: Options, source: str = "input") -
         extractor = str(data.get("extractor") or "")
         origin = "adlib" if "facebook" in extractor and "ads" in extractor else "json"
         inc.add_text("\n".join(parts), origin, path=str(path), title=str(data.get("title") or ""))
+    elif str(data.get("tool", "")).startswith("page-capture"):   # manifest narzędzia page-capture
+        inc.add(JSON, path, source=source, type="page_capture", observed_at=data.get("captured_at"),
+                title=data.get("title"))
+        if data.get("page_url"):
+            inc.add_url(data["page_url"], "metadata")
     elif "url" in data and "timestamp_utc" in data:          # archive_info.json z archiwum strony
         inc.add(JSON, path, source=source, type="archive_info", observed_at=data.get("timestamp_utc"))
         inc.add_url(data["url"], "metadata")
@@ -310,15 +315,77 @@ HANDLERS: dict[str, Callable] = {
 
 # ============================================================================ folder przypadku
 
+def _is_page_capture(manifest: Path) -> bool:
+    try:
+        return b"page-capture" in manifest.read_bytes()[:400]
+    except OSError:
+        return False
+
+
+def _is_mpegts(path: Path) -> bool:
+    """Kawałek strumienia wideo (MPEG-TS: bajt 0x47 co 188 bajtów), a nie plik TypeScript."""
+    try:
+        with open(path, "rb") as f:
+            head = f.read(188 * 3 + 1)
+        return len(head) > 376 and head[0] == 0x47 and head[188] == 0x47 and head[376] == 0x47
+    except OSError:
+        return False
+
+
+def _hls_into(inc: Incident, folder: Path, parts: list[Path], o: Options, source: str) -> None:
+    """Sklejamy zapisane kawałki strumienia w jeden plik mp4 dla modułu audio/wideo.
+
+    Narzędzia do zapisu stron często łapią tylko początek strumienia (np. 2 z 105 kawałków) –
+    zapisujemy w meta, ile kawałków brakuje, i dopisujemy to do braków.
+    """
+    import subprocess
+    listed = 0
+    for m3u8 in folder.glob("*.m3u8"):
+        try:
+            listed = max(listed, sum(1 for line in m3u8.read_text(errors="replace").splitlines()
+                                     if line.strip() and not line.startswith("#")))
+        except OSError:
+            pass
+    out_dir = Path(inc.store_dir) / "av"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"stream_{len(inc.of_kind(VIDEO)) + 1}.mp4"
+    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", "concat:" + "|".join(str(p) for p in parts),
+                        "-c", "copy", "-bsf:a", "aac_adtstoasc", str(out)], capture_output=True, timeout=300)
+    if r.returncode != 0 or not out.exists():
+        inc.errors.append(f"sklejanie strumienia wideo {folder.name}: "
+                          f"{r.stderr.decode('utf-8', 'replace').strip()[:200]}")
+        return
+    inc.add(VIDEO, out, source=source, stream=True, segments_saved=len(parts), segments_listed=listed or None,
+            origin_folder=str(folder))
+    if listed > len(parts):
+        inc.missing.append(f"wideo ze strony zapisane częściowo: {len(parts)} z {listed} kawałków strumienia")
+    if o.video:
+        from . import video as v
+        info = v.probe(out)
+        if info.get("has_audio"):
+            audio = v.extract_audio(out, out_dir)
+            if audio:
+                inc.add(AUDIO, audio, source="video", video=str(out))
+        for frame in v.extract_frames(out, out_dir, info.get("duration") or 0):
+            inc.add(FRAME, frame, source="video", video=str(out))
+
+
 def _load_folder(inc: Incident, root: Path, o: Options, source: str) -> None:
     """Folder przypadku (BACKUP/pX, DANE/<nr>, rozpakowane archiwum albo pliki z uploadu).
 
     Kolejność: metadane -> strony HTML -> HAR -> teksty -> zrzuty (OCR) -> wideo -> zasoby stron.
     """
     files = sorted(p for p in root.rglob("*") if p.is_file())
-    in_assets = lambda p: any(part.endswith("_files") for part in p.relative_to(root).parts[:-1])
+    # zapis narzędziem page-capture: manifest.json + resources/ (obrazy, skrypty, kawałki wideo)
+    capture_roots = [p.parent for p in files if p.name == "manifest.json" and _is_page_capture(p)]
+    in_capture_res = lambda p: any((r / "resources") in p.parents for r in capture_roots)
+    in_assets = lambda p: any(part.endswith("_files") for part in p.relative_to(root).parts[:-1]) \
+        or in_capture_res(p)
     main = [p for p in files if not in_assets(p)]
     assets = [p for p in files if in_assets(p)]
+    # strumień wideo HLS (kawałki .ts + lista .m3u8) – z zasobów strony albo luzem
+    ts_files = [p for p in files if p.suffix.lower() == ".ts" and _is_mpegts(p)]
+    main = [p for p in main if p not in ts_files and p.suffix.lower() != ".m3u8"]
 
     extracted = {p.name for p in root.rglob("*") if p.is_dir()}
     by_ext: dict[str, list[Path]] = {}
@@ -361,6 +428,11 @@ def _load_folder(inc: Incident, root: Path, o: Options, source: str) -> None:
             _audio(inc, p, o, source)
     for p in by_ext.get(".zip", []):
         _archive(inc, p, o, source)
+    by_dir: dict[Path, list[Path]] = {}
+    for p in ts_files:
+        by_dir.setdefault(p.parent, []).append(p)
+    for folder, parts in sorted(by_dir.items()):
+        _hls_into(inc, folder, sorted(parts), o, source)
 
     if o.assets:
         images = [p for p in assets if p.suffix.lower() in IMAGE_EXT]
@@ -418,29 +490,41 @@ def _fetch_into(inc: Incident, url: str, o: Options) -> None:
 
 # ============================================================================ złożenie wyniku
 
-def finalize(inc: Incident, o: Options) -> None:
-    """Wybiera tekst dla modułu tekstu, ustala status i braki, sprawdza duplikaty, zapisuje wynik."""
+MIN_WORDS = 15   # krótszy tekst (np. sam tytuł reklamy „Czytać”) ustępuje następnemu źródłu
+
+
+def select_text(inc: Incident) -> None:
+    """Wybiera tekst dla modułu tekstu spośród wszystkich składników TEXT materiału.
+
+    Wywoływane w finalize() i ponownie, gdy moduł audio/wideo dopisze transkrypcję.
+    """
     parts = [a for a in inc.of_kind(TEXT) if a.value and a.value.strip()]
     # tekst podany przez użytkownika: dołączamy go, o ile to coś więcej niż sam link
     from .screenshot import OCR_URL_RE
     user = [a for a in parts if a.source == "input" and len(OCR_URL_RE.sub(" ", a.value).split()) >= 3]
     good = [a for a in parts if not a.meta.get("error_page") and a.source != "input"]
-    chosen_origin, chosen = None, []
+    chosen_origin, chosen, fallback = None, [], None
     for origin in TEXT_PRIORITY[1:]:
         if origin in PAGE_ORIGINS:
-            if chosen_origin in PAGE_ORIGINS:
-                continue
             group = _best_per_page([a for a in good if a.source in PAGE_ORIGINS])
             origin = group[0].source if group else origin
         else:
             group = [a for a in good if a.source == origin]
-        if group:
-            chosen_origin, chosen = origin, group
-            break
+        if not group:
+            continue
+        if sum(len(a.value.split()) for a in group) < MIN_WORDS:
+            fallback = fallback or (origin, group)
+            continue
+        chosen_origin, chosen = origin, group
+        break
+    if not chosen and fallback:
+        chosen_origin, chosen = fallback
     errors_only = [a for a in parts if a.source != "input"]
+    note = "dostępna tylko strona błędu (np. 502) – tekst niewiarygodny"
     if not chosen and not user and errors_only:  # zostały tylko strony błędów – lepsze to niż nic
         chosen_origin, chosen = "html", errors_only
-        inc.missing.append("dostępna tylko strona błędu (np. 502) – tekst niewiarygodny")
+        if note not in inc.missing:
+            inc.missing.append(note)
     if user:
         chosen = user + chosen
         chosen_origin = chosen_origin or "input"
@@ -453,11 +537,18 @@ def finalize(inc: Incident, o: Options) -> None:
     inc.text = "\n\n".join(texts)
     inc.text_origin = [{"page_text": "html", "har": "html"}.get(chosen_origin, chosen_origin)] \
         if chosen_origin else []
+    if inc.text and "moduł tekstu: brak tekstu" in inc.missing:
+        inc.missing.remove("moduł tekstu: brak tekstu")
 
     titles = [a.meta.get("title") for a in inc.of_kind(HTML, TEXT)
               if a.meta.get("title") and not a.meta.get("error_page")]
     inc.title = titles[0] if titles else next(
         (a.meta.get("title") for a in inc.of_kind(HTML, TEXT) if a.meta.get("title")), "") or ""
+
+
+def finalize(inc: Incident, o: Options) -> None:
+    """Wybiera tekst dla modułu tekstu, ustala status i braki, sprawdza duplikaty, zapisuje wynik."""
+    select_text(inc)
 
     if inc.urls and not inc.final_url:
         inc.final_url = inc.redirect_chain[-1] if inc.redirect_chain else inc.urls[0]

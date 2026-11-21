@@ -54,7 +54,9 @@ osint_rec = run_osint(inc)   # moduł OSINT kolegów (modules/osint)
 1. Tekst wpisany przez użytkownika dołączamy zawsze, o ile to coś więcej niż sam link.
 2. Tekst strony: dla **każdej strony osobno** (np. `DANE/61/strona_1..3`) bierzemy najlepsze źródło:
    zapisany HTML > `page_text.txt` > HTML wyciągnięty z HAR-a. Identyczne teksty liczymy raz.
-3. Gdy nie ma strony: opis reklamy z Biblioteki Reklam (`adlib`), inne metadane (`json`), OCR.
+3. Gdy nie ma strony: opis reklamy z Biblioteki Reklam (`adlib`), inne metadane (`json`), transkrypcja
+   z modułu audio/wideo (`transcript`), OCR. Źródło krótsze niż 15 słów ustępuje następnemu.
+   Wybór robi `select_text(inc)`; moduł audio/wideo wywołuje ją ponownie po dopisaniu transkrypcji.
 4. **Strony błędów** (502 Cloudflare, 404, parking domeny, „Just a moment…”) są pomijane. Użyjemy ich
    tylko wtedy, gdy nic innego nie ma, i dopisujemy to w `missing`.
 
@@ -68,6 +70,11 @@ Kolejność: metadane JSON → strony HTML → HAR → pliki `.txt` → zrzuty (
 * ZIP rozpakowany już obok (np. `archive_dorquesio.click_…`) nie jest czytany drugi raz.
 * W archiwum strony `source.html` pomijamy, gdy jest `rendered.html`.
 * Plik nazwany samym rozszerzeniem (`.har`) też jest rozpoznawany.
+* Zapis strony narzędziem page-capture (`manifest.json` + `resources/`): adres strony z manifestu,
+  obrazy z `resources/` idą jako zasoby strony (nie jako zrzuty do OCR).
+* Wideo ze strony zapisane jako strumień (`.m3u8` + kawałki `.ts`) jest sklejane w jeden plik mp4
+  (`data/store/<id>/av/stream_N.mp4`); brakujące kawałki są wpisywane do braków. Pliki `.ts` są
+  rozpoznawane po zawartości, więc skrypty TypeScript nie zostaną pomylone z wideo.
 * Popularne domeny z OCR (`cloudflare.com`, „AMAZON.COM” w treści reklamy) nie są adresem materiału.
 
 ## Pobieranie stron (URL)

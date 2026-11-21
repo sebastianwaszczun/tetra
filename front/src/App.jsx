@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { resolveInput, TYPE_LABELS } from './resolveInput.js'
 
 import sit0 from './assets/cat/sit-0.webp'
 import sit1 from './assets/cat/sit-1.webp'
@@ -12,6 +11,15 @@ import catHang from './assets/cat/hang.webp'
 
 const SIT_FRAMES = [sit0, sit1, sit2, sit3, sit4, sit5]
 
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|avif)$/i
+const isImage = (f) => f.type.startsWith('image/') || IMAGE_EXT.test(f.name)
+const fileKey = (f) => `${f.name}|${f.size}|${f.lastModified}`
+const plikow = (n) => {
+  const d = n % 10, dd = n % 100
+  return n === 1 ? 'plik' : d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? 'pliki' : 'plików'
+}
+
 const STEPS = [
   'Zbieram odciski łap…',
   'Sprawdzam nadawcę i adres…',
@@ -20,7 +28,7 @@ const STEPS = [
   'Spisuję raport…',
 ]
 
-const NAV = ['Jak to działa', 'Jak się bronić', 'Typy oszustw']
+const NAV = ['PRZEGLAD KAMPANII']
 
 const CARDS = [
   {
@@ -38,7 +46,7 @@ const CARDS = [
   },
   {
     title: 'Plik',
-    hint: 'PDF, mail .eml, dokument',
+    hint: 'wideo, HAR, HTML, dokument',
     pick: '*/*',
     icon: (
       <>
@@ -141,14 +149,14 @@ export default function App() {
   const [glance, setGlance] = useState(false)
   const [phase, setPhase] = useState('idle')
   const [stepIdx, setStepIdx] = useState(0)
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [preview, setPreview] = useState(null)
   const [dragging, setDragging] = useState(false)
-  const [resolved, setResolved] = useState(null)
 
   const timers = useRef({})
   const inputRef = useRef(null)
   const fileRef = useRef(null)
+  const request = useRef(null)
   const live = useRef({ focused, phase })
   live.current = { focused, phase }
 
@@ -182,11 +190,12 @@ export default function App() {
   }, [phase])
 
   useEffect(() => {
-    if (!file || resolveInput(file).type !== 'image') { setPreview(null); return }
-    const url = URL.createObjectURL(file)
+    const img = files.find(isImage)
+    if (!img) { setPreview(null); return }
+    const url = URL.createObjectURL(img)
     setPreview(url)
     return () => URL.revokeObjectURL(url)
-  }, [file])
+  }, [files])
 
   const idle = phase === 'idle'
   const expanded = phase === 'open'
@@ -200,22 +209,35 @@ export default function App() {
         : phase === 'closing' ? 'letgo'
           : ''
 
-  const handleSearch = (result) => {
-    setResolved(result)
-    console.log('search', result)
+  const send = (text, list) => {
+    const body = new FormData()
+    if (text) body.append('text', text)
+    body.append('osint', 'true')
+    list.forEach((f) => body.append('files', f, f.name))
+    request.current?.abort()
+    const ctrl = new AbortController()
+    request.current = ctrl
+    fetch(`${API_URL}/analyze`, { method: 'POST', body, signal: ctrl.signal })
+      .then((r) => r.json())
+      .then((data) => console.log('analyze', data))
+      .catch((err) => { if (err.name !== 'AbortError') console.error('analyze', err) })
   }
 
-  const attach = (f) => {
-    if (!f || !idle) return
-    setFile(f)
+  const attach = (list) => {
+    const added = Array.from(list ?? []).filter(Boolean)
+    if (!added.length || !idle) return
+    setFiles((prev) => {
+      const seen = new Set(prev.map(fileKey))
+      return [...prev, ...added.filter((f) => !seen.has(fileKey(f)))]
+    })
     setFocused(false)
     setTyping(false)
     setGlance(true)
     later('glance', () => setGlance(false), 1400)
   }
 
-  const clearFile = () => {
-    setFile(null)
+  const clearFiles = () => {
+    setFiles([])
     if (fileRef.current) fileRef.current.value = ''
     requestAnimationFrame(() => inputRef.current?.focus())
   }
@@ -227,15 +249,15 @@ export default function App() {
   }
 
   const onPaste = (e) => {
-    const f = e.clipboardData?.files?.[0]
-    if (f) { e.preventDefault(); attach(f) }
+    const list = e.clipboardData?.files
+    if (list?.length) { e.preventDefault(); attach(list) }
   }
 
   const onDrop = (e) => {
     e.preventDefault()
     setDragging(false)
-    const f = e.dataTransfer?.files?.[0]
-    if (f) attach(f)
+    const list = e.dataTransfer?.files
+    if (list?.length) attach(list)
     else {
       const t = e.dataTransfer?.getData('text')
       if (t && idle) setQ(t)
@@ -244,9 +266,9 @@ export default function App() {
 
   const submit = () => {
     if (phase !== 'idle') return
-    const result = resolveInput(file ?? q)
-    if (!result) { inputRef.current?.focus(); return }
-    handleSearch(result)
+    const text = q.trim()
+    if (!text && !files.length) { inputRef.current?.focus(); return }
+    send(text, files)
     document.activeElement?.blur?.()
     setPhase('jump')
     setTyping(false)
@@ -260,6 +282,7 @@ export default function App() {
 
   const cancel = () => {
     if (phase !== 'open') return
+    request.current?.abort()
     setPhase('closing')
     later('close', () => setPhase('idle'), 750)
   }
@@ -279,7 +302,7 @@ export default function App() {
       </svg>
 
       <header className="header">
-        <a className="logo" href="#">LOGO</a>
+        <a className="logo" href="#">TETRA</a>
         <nav className="nav" aria-label="Główna">
           {NAV.map((label) => <NavLink key={label}>{label}</NavLink>)}
         </nav>
@@ -332,35 +355,32 @@ export default function App() {
                   <circle cx="14" cy="14" r="9.5" />
                   <path d="M21 21 L31 31" />
                 </svg>
-                {file ? (
-                  <div className="chip">
+                {files.length > 0 && (
+                  <div className="chip files" title={files.map((f) => f.name).join('\n')}>
                     {preview
                       ? <img className="chip-thumb" src={preview} alt="" />
                       : <svg className="chip-icon" aria-hidden="true" width="22" height="22" viewBox="0 0 64 56"><path d="M16 4 H38 L50 16 V52 H16 Z" /><path d="M38 4 V16 H50" /></svg>}
-                    <span className="chip-name" title={file.name}>{file.name}</span>
-                    <button className="chip-x" type="button" onClick={clearFile} aria-label="Usuń plik" disabled={!idle}>×</button>
+                    <span className="chip-name">{files.length === 1 ? files[0].name : `${files.length} ${plikow(files.length)}`}</span>
+                    <button className="chip-x" type="button" onClick={clearFiles} aria-label="Usuń pliki" disabled={!idle}>×</button>
                     <span className="ink" aria-hidden="true" />
                   </div>
-                ) : (
-                  <>
-                    <label htmlFor="hero-q" className="sr-only">Co sprawdzić?</label>
-                    <input
-                      ref={inputRef}
-                      id="hero-q"
-                      className="q"
-                      type="search"
-                      autoComplete="off"
-                      placeholder={dragging ? 'Upuść tutaj…' : 'Wklej tekst, link, nazwę produktu albo dodaj plik…'}
-                      value={q}
-                      onChange={onType}
-                      onPaste={onPaste}
-                      onFocus={() => setFocused(true)}
-                      onBlur={() => { setFocused(false); setTyping(false) }}
-                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
-                    />
-                  </>
                 )}
-                <button className="attach" type="button" onClick={() => pickFile('*/*')} aria-label="Dodaj obraz lub plik" title="Dodaj obraz lub plik">
+                <label htmlFor="hero-q" className="sr-only">Co sprawdzić?</label>
+                <input
+                  ref={inputRef}
+                  id="hero-q"
+                  className="q"
+                  type="search"
+                  autoComplete="off"
+                  placeholder={dragging ? 'Upuść tutaj…' : files.length ? 'Dodaj tekst lub link (opcjonalnie)…' : 'Wklej tekst, link, nazwę produktu albo dodaj pliki…'}
+                  value={q}
+                  onChange={onType}
+                  onPaste={onPaste}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => { setFocused(false); setTyping(false) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
+                />
+                <button className="attach" type="button" onClick={() => pickFile('*/*')} aria-label="Dodaj pliki" title="Dodaj pliki">
                   <svg aria-hidden="true" width="26" height="26" viewBox="0 0 34 34">
                     <path d="M23 10 L12 21 C9.5 23.5 9.5 27 12 28.5 C14.5 30.5 17.5 30 20 27.5 L28 19.5 C32 15.5 32 10 28.5 6.5 C25 3 19.5 3 15.5 7 L6 16.5" />
                   </svg>
@@ -368,8 +388,9 @@ export default function App() {
                 <input
                   ref={fileRef}
                   type="file"
+                  multiple
                   hidden
-                  onChange={(e) => attach(e.target.files?.[0])}
+                  onChange={(e) => { attach(e.target.files); e.target.value = '' }}
                 />
                 <button className="go" type="button" onClick={submit}>Szukaj</button>
               </div>
@@ -394,9 +415,6 @@ export default function App() {
                     <div className="ink" />
                   </div>
                   <div className="step" key={stepIdx}>{STEPS[stepIdx % STEPS.length]}</div>
-                  {resolved && (
-                    <div className="trop">Rozpoznany trop: <b>{TYPE_LABELS[resolved.type]}</b></div>
-                  )}
                 </div>
                 <DashedLine />
                 <div className="loading-actions">
@@ -443,7 +461,7 @@ export default function App() {
         <div className="logos">
           {[0, 1, 2].map((i) => (
             <div className="logo-box" key={i}>
-              LOGO
+              TETRA
               <div className="ink" aria-hidden="true" />
             </div>
           ))}

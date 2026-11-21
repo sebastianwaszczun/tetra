@@ -8,6 +8,10 @@ __pycache__/
 DANE/
 DANE*.zip
 do_udostępnienia/
+*.zip
 
+# materiały od organizatorów (treść zadania NASK) – tylko lokalnie
+docs/tresc_zadania_nask.pdf
+.venv/
 # Dokumentacja (.md) zostaje lokalnie, do repo trafia tylko kod.
 *.md

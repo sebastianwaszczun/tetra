@@ -59,17 +59,45 @@ services:
       NEO4J_USER: ${NEO4J_USER:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD:-fakecollector}
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-fake}
-      PYTHONPATH: /workspace/src
+      PYTHONPATH: /workspace/src:/workspace/modules
+      STORE_DIR: /workspace/data/store
     ports:
       - "${JUPYTER_PORT:-8888}:8888"
     volumes:
       - ./src:/workspace/src          # kod zespołu
+      - ./modules:/workspace/modules  # moduł OSINT (import osint)
       - ./data:/workspace/data        # dane (np. rozpakowany ___BACKUP.zip)
       - ./scripts:/workspace/scripts
       - ./tests:/workspace/tests
       - ./config:/workspace/config
       - models:/models                # cache modeli – pobierane raz, współdzielone
     shm_size: "2gb"
+
+  # FastAPI – wejście do potoku dla frontu i harmonogramu. Dokumentacja: http://localhost:8000/docs
+  api:
+    image: fakecollector-app:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    command: uvicorn fakecollector.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /workspace/src --reload-dir /workspace/modules
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-fakecollector}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
+      PYTHONPATH: /workspace/src:/workspace/modules
+      STORE_DIR: /workspace/data/store
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./src:/workspace/src
+      - ./modules:/workspace/modules
+      - ./data:/workspace/data
+      - models:/models
 
 volumes:
   pgdata:

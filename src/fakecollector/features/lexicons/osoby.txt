@@ -1,0 +1,27 @@
+# Osoby, których wizerunek często kradną fałszywe reklamy.
+# Format: Imię i nazwisko | wyrażenie regularne (małe litery, obejmuje odmianę)
+# Popularne nazwiska (Lewandowski, Prokop, Stoch) wymagają imienia, bo fałszywe komentarze
+# pod artykułami używają zwykłych nazwisk.
+# Dopisuj osoby z bazy referencyjnej modułu obrazu, żeby oba moduły mówiły o tych samych ludziach.
+Rafał Brzoska | brzosk\w*
+Krzysztof Stanowski | stanowsk\w*
+Tomasz Sekielski | sekielsk\w*
+Monika Olejnik | olejnik\w*
+Adam Glapiński | glapińsk\w*
+Mateusz Morawiecki | morawieck\w*
+Donald Tusk | tusk(?:a|owi|iem|u)?
+Andrzej Duda | (?:andrzej\w*\s+)dud(?:a|y|zie|ę|ą|o)
+Karol Nawrocki | nawrock\w*
+Rafał Trzaskowski | trzaskowsk\w*
+Szymon Hołownia | hołowni\w*
+Robert Lewandowski | robert\w*\s+lewandowsk\w*
+Kuba Wojewódzki | wojewódzk\w*
+Marcin Prokop | marcin\w*\s+prokop\w*
+Dorota Wellman | wellman
+Piotr Kraśko | kraśk(?:o|i|a|iem|owi)
+Bogdan Rymanowski | rymanowsk\w*
+Tomasz Lis | tomasz\w*\s+lis(?:a|owi|em|ie)?
+Ewa Chodakowska | chodakowsk\w*
+Kamil Stoch | kamil\w*\s+stoch\w*
+Iga Świątek | świąt(?:ek|ka|kowi|kiem|ce)
+Elon Musk | musk(?:a|owi|iem)?

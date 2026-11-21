@@ -20,7 +20,7 @@ const STEPS = [
   'Spisuję raport…',
 ]
 
-const NAV = ['Jak to działa', 'Jak się bronić', 'Typy oszustw']
+const NAV = ['PRZEGLAD KAMPANII']
 
 const CARDS = [
   {
@@ -279,7 +279,7 @@ export default function App() {
       </svg>
 
       <header className="header">
-        <a className="logo" href="#">LOGO</a>
+        <a className="logo" href="#">TETRA</a>
         <nav className="nav" aria-label="Główna">
           {NAV.map((label) => <NavLink key={label}>{label}</NavLink>)}
         </nav>
@@ -443,7 +443,7 @@ export default function App() {
         <div className="logos">
           {[0, 1, 2].map((i) => (
             <div className="logo-box" key={i}>
-              LOGO
+              TETRA
               <div className="ink" aria-hidden="true" />
             </div>
           ))}

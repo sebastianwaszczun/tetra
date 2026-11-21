@@ -1,0 +1,53 @@
+# --- Twarze ---
+insightface==0.7.3          # ArcFace embeddingi (512-d), detekcja twarzy
+onnxruntime>=1.17           # backend dla insightface (CPU)
+facetorch                   # deepfake, emocje, landmarki (modele pobiera przy 1. uruchomieniu)
+opencv-python-headless
+# MagFace nie ma pakietu pip – patrz README (repo + wagi, scripts/download_models.py)
+
+# --- Obraz i szablon ---
+ImageHash                   # perceptual hash (pHash/dHash) – duplikaty kreacji
+open_clip_torch             # CLIP
+transformers>=4.40          # SigLIP
+Pillow
+
+# --- Tekst ---
+pytesseract                 # OCR (tesseract z pakietem pol)
+sentence-transformers       # embeddingi narracji (model wielojęzyczny, PL)
+datasketch                  # MinHash / LSH – niemal-duplikaty tekstu
+
+# --- Głos ---
+speechbrain>=1.0            # ECAPA-TDNN: embeddingi mówcy (192-d), klonowany głos
+soundfile
+librosa
+
+# --- Infrastruktura / OSINT ---
+requests
+httpx
+beautifulsoup4
+lxml
+tldextract
+dnspython                   # rekordy DNS
+python-whois                # WHOIS
+ipwhois                     # RDAP dla IP
+cryptography                # parsowanie certyfikatów
+mmh3                        # hash favicony (styl Shodan)
+playwright                  # łańcuchy przekierowań JS, HAR, zrzuty
+
+# --- Łączenie / klastrowanie / graf ---
+scikit-learn>=1.3           # zawiera HDBSCAN (sklearn.cluster.HDBSCAN)
+networkx
+neo4j                       # sterownik Neo4j
+
+# --- Bazy ---
+psycopg[binary]>=3.1
+pgvector                    # typ vector dla psycopg/SQLAlchemy
+SQLAlchemy>=2.0
+
+# --- Praca zespołowa ---
+pandas
+tqdm
+python-dotenv
+jupyterlab
+ipywidgets
+matplotlib

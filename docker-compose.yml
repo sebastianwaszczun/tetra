@@ -1,0 +1,75 @@
+name: fakecollector
+
+services:
+  # PostgreSQL 16 + pgvector – reklamy, metadane i embeddingi (twarze, obraz, tekst, głos)
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fake}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fake}
+      POSTGRES_DB: ${POSTGRES_DB:-fakecollector}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fake} -d ${POSTGRES_DB:-fakecollector}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Neo4j – graf powiązań reklam/kampanii z uzasadnieniem na każdej krawędzi
+  neo4j:
+    image: neo4j:5-community
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-fakecollector}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_max__size: 1G
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"   # przeglądarka: http://localhost:7474
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - neo4jdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # Python + ML: InsightFace, facetorch, CLIP/SigLIP, sentence-transformers, OCR,
+  # SpeechBrain, MinHash/LSH, HDBSCAN, narzędzia OSINT. Startuje JupyterLab.
+  app:
+    build:
+      context: .
+      args:
+        TORCH_INDEX: ${TORCH_INDEX:-https://download.pytorch.org/whl/cpu}
+    image: fakecollector-app:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-fakecollector}
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN:-fake}
+      PYTHONPATH: /workspace/src
+    ports:
+      - "${JUPYTER_PORT:-8888}:8888"
+    volumes:
+      - ./src:/workspace/src          # kod zespołu
+      - ./data:/workspace/data        # dane (np. rozpakowany ___BACKUP.zip)
+      - ./scripts:/workspace/scripts
+      - models:/models                # cache modeli – pobierane raz, współdzielone
+    shm_size: "2gb"
+
+volumes:
+  pgdata:
+  neo4jdata:
+  models:

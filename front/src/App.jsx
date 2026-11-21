@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { resolveInput, TYPE_LABELS } from './resolveInput.js'
 
 import sit0 from './assets/cat/sit-0.webp'
 import sit1 from './assets/cat/sit-1.webp'
@@ -9,7 +10,6 @@ import sit5 from './assets/cat/sit-5.webp'
 import catJump from './assets/cat/jump.webp'
 import catHang from './assets/cat/hang.webp'
 
-// 0 = idle, 1–4 = typing loop, 5 = looking at the input (focus / glance)
 const SIT_FRAMES = [sit0, sit1, sit2, sit3, sit4, sit5]
 
 const STEPS = [
@@ -24,22 +24,33 @@ const NAV = ['Jak to działa', 'Jak się bronić', 'Typy oszustw']
 
 const CARDS = [
   {
-    title: 'Tekst',
-    kicker: 'SMS / e-mail',
-    text: 'Wklej treść wiadomości, która wzbudza podejrzenia.',
+    title: 'Obraz',
+    hint: 'screen reklamy, zdjęcie',
+    pick: 'image/*',
     icon: (
       <>
-        <rect x="3" y="14" width="40" height="28" rx="2" />
-        <path d="M3 16 L23 31 L43 16" />
-        <path d="M30 4 H60 V26 H50 L44 33 V26 H38" />
-        <path d="M44 12 H54 M44 18 H51" />
+        <path d="M4 14 V4 H14 M50 4 H60 V14 M60 42 V52 H50 M14 52 H4 V42" />
+        <rect x="13" y="12" width="38" height="32" rx="2" />
+        <circle cx="23" cy="21" r="3.2" />
+        <path d="M13 40 L25 29 L33 36 L39 31 L51 41" />
+      </>
+    ),
+  },
+  {
+    title: 'Plik',
+    hint: 'PDF, mail .eml, dokument',
+    pick: '*/*',
+    icon: (
+      <>
+        <path d="M16 4 H38 L50 16 V52 H16 Z" />
+        <path d="M38 4 V16 H50" />
+        <path d="M24 26 H42 M24 34 H42 M24 42 H35" />
       </>
     ),
   },
   {
     title: 'Link',
-    kicker: 'adres strony',
-    text: 'Podaj adres strony, którą chcesz prześwietlić.',
+    hint: 'adres podejrzanej strony',
     icon: (
       <>
         <rect x="3" y="5" width="58" height="44" rx="3" />
@@ -53,15 +64,25 @@ const CARDS = [
     ),
   },
   {
-    title: 'Screen',
-    kicker: 'zrzut reklamy',
-    text: 'Wrzuć zrzut ekranu reklamy albo posta.',
+    title: 'Tekst',
+    hint: 'treść SMS-a lub maila',
     icon: (
       <>
-        <path d="M4 14 V4 H14 M50 4 H60 V14 M60 42 V52 H50 M14 52 H4 V42" />
-        <rect x="13" y="12" width="38" height="32" rx="2" />
-        <circle cx="23" cy="21" r="3.2" />
-        <path d="M13 40 L25 29 L33 36 L39 31 L51 41" />
+        <rect x="3" y="14" width="40" height="28" rx="2" />
+        <path d="M3 16 L23 31 L43 16" />
+        <path d="M30 4 H60 V26 H50 L44 33 V26 H38" />
+        <path d="M44 12 H54 M44 18 H51" />
+      </>
+    ),
+  },
+  {
+    title: 'Produkt',
+    hint: 'nazwa z podejrzanej oferty',
+    icon: (
+      <>
+        <path d="M5 30 L29 5 H57 V29 L33 53 Z" />
+        <circle cx="46" cy="16" r="4" />
+        <path d="M22 35 L34 23 M28 41 L40 29" />
       </>
     ),
   },
@@ -118,11 +139,16 @@ export default function App() {
   const [typing, setTyping] = useState(false)
   const [frame, setFrame] = useState(0)
   const [glance, setGlance] = useState(false)
-  // idle → jump → pull → open → closing → idle
   const [phase, setPhase] = useState('idle')
   const [stepIdx, setStepIdx] = useState(0)
+  const [file, setFile] = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [dragging, setDragging] = useState(false)
+  const [resolved, setResolved] = useState(null)
 
   const timers = useRef({})
+  const inputRef = useRef(null)
+  const fileRef = useRef(null)
   const live = useRef({ focused, phase })
   live.current = { focused, phase }
 
@@ -131,17 +157,14 @@ export default function App() {
     timers.current[name] = setTimeout(fn, ms)
   }
 
-  // clear all pending timeouts on unmount
   useEffect(() => () => Object.values(timers.current).forEach(clearTimeout), [])
 
-  // typing animation loop
   useEffect(() => {
     if (!typing) return
     const id = setInterval(() => setFrame((f) => (f + 1) % 5), 140)
     return () => clearInterval(id)
   }, [typing])
 
-  // occasional glance at the search bar while idle
   useEffect(() => {
     const id = setInterval(() => {
       if (!live.current.focused && live.current.phase === 'idle') {
@@ -152,12 +175,18 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  // rotate loading messages
   useEffect(() => {
     if (phase !== 'open') return
     const id = setInterval(() => setStepIdx((i) => i + 1), 1700)
     return () => clearInterval(id)
   }, [phase])
+
+  useEffect(() => {
+    if (!file || resolveInput(file).type !== 'image') { setPreview(null); return }
+    const url = URL.createObjectURL(file)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
 
   const idle = phase === 'idle'
   const expanded = phase === 'open'
@@ -171,8 +200,53 @@ export default function App() {
         : phase === 'closing' ? 'letgo'
           : ''
 
+  const handleSearch = (result) => {
+    setResolved(result)
+    console.log('search', result)
+  }
+
+  const attach = (f) => {
+    if (!f || !idle) return
+    setFile(f)
+    setFocused(false)
+    setTyping(false)
+    setGlance(true)
+    later('glance', () => setGlance(false), 1400)
+  }
+
+  const clearFile = () => {
+    setFile(null)
+    if (fileRef.current) fileRef.current.value = ''
+    requestAnimationFrame(() => inputRef.current?.focus())
+  }
+
+  const pickFile = (accept) => {
+    if (!idle || !fileRef.current) return
+    fileRef.current.accept = accept
+    fileRef.current.click()
+  }
+
+  const onPaste = (e) => {
+    const f = e.clipboardData?.files?.[0]
+    if (f) { e.preventDefault(); attach(f) }
+  }
+
+  const onDrop = (e) => {
+    e.preventDefault()
+    setDragging(false)
+    const f = e.dataTransfer?.files?.[0]
+    if (f) attach(f)
+    else {
+      const t = e.dataTransfer?.getData('text')
+      if (t && idle) setQ(t)
+    }
+  }
+
   const submit = () => {
     if (phase !== 'idle') return
+    const result = resolveInput(file ?? q)
+    if (!result) { inputRef.current?.focus(); return }
+    handleSearch(result)
     document.activeElement?.blur?.()
     setPhase('jump')
     setTyping(false)
@@ -245,25 +319,57 @@ export default function App() {
             </div>
           </div>
 
-          <div className={'bar' + (focused ? ' focus' : '')} style={{ height: barH }}>
+          <div
+            className={'bar' + (focused || dragging ? ' focus' : '')}
+            style={{ height: barH }}
+            onDragOver={(e) => { if (idle) { e.preventDefault(); setDragging(true) } }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+          >
             <div className="clip">
               <div className="search-row" role="search">
                 <svg className="search-icon" aria-hidden="true" width="26" height="26" viewBox="0 0 34 34">
                   <circle cx="14" cy="14" r="9.5" />
                   <path d="M21 21 L31 31" />
                 </svg>
-                <label htmlFor="hero-q" className="sr-only">Czego szukasz?</label>
+                {file ? (
+                  <div className="chip">
+                    {preview
+                      ? <img className="chip-thumb" src={preview} alt="" />
+                      : <svg className="chip-icon" aria-hidden="true" width="22" height="22" viewBox="0 0 64 56"><path d="M16 4 H38 L50 16 V52 H16 Z" /><path d="M38 4 V16 H50" /></svg>}
+                    <span className="chip-name" title={file.name}>{file.name}</span>
+                    <button className="chip-x" type="button" onClick={clearFile} aria-label="Usuń plik" disabled={!idle}>×</button>
+                    <span className="ink" aria-hidden="true" />
+                  </div>
+                ) : (
+                  <>
+                    <label htmlFor="hero-q" className="sr-only">Co sprawdzić?</label>
+                    <input
+                      ref={inputRef}
+                      id="hero-q"
+                      className="q"
+                      type="search"
+                      autoComplete="off"
+                      placeholder={dragging ? 'Upuść tutaj…' : 'Wklej tekst, link, nazwę produktu albo dodaj plik…'}
+                      value={q}
+                      onChange={onType}
+                      onPaste={onPaste}
+                      onFocus={() => setFocused(true)}
+                      onBlur={() => { setFocused(false); setTyping(false) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
+                    />
+                  </>
+                )}
+                <button className="attach" type="button" onClick={() => pickFile('*/*')} aria-label="Dodaj obraz lub plik" title="Dodaj obraz lub plik">
+                  <svg aria-hidden="true" width="26" height="26" viewBox="0 0 34 34">
+                    <path d="M23 10 L12 21 C9.5 23.5 9.5 27 12 28.5 C14.5 30.5 17.5 30 20 27.5 L28 19.5 C32 15.5 32 10 28.5 6.5 C25 3 19.5 3 15.5 7 L6 16.5" />
+                  </svg>
+                </button>
                 <input
-                  id="hero-q"
-                  className="q"
-                  type="search"
-                  autoComplete="off"
-                  placeholder="Wklej SMS, maila, link albo wrzuć screen…"
-                  value={q}
-                  onChange={onType}
-                  onFocus={() => setFocused(true)}
-                  onBlur={() => { setFocused(false); setTyping(false) }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submit() } }}
+                  ref={fileRef}
+                  type="file"
+                  hidden
+                  onChange={(e) => attach(e.target.files?.[0])}
                 />
                 <button className="go" type="button" onClick={submit}>Szukaj</button>
               </div>
@@ -288,6 +394,9 @@ export default function App() {
                     <div className="ink" />
                   </div>
                   <div className="step" key={stepIdx}>{STEPS[stepIdx % STEPS.length]}</div>
+                  {resolved && (
+                    <div className="trop">Rozpoznany trop: <b>{TYPE_LABELS[resolved.type]}</b></div>
+                  )}
                 </div>
                 <DashedLine />
                 <div className="loading-actions">
@@ -306,16 +415,21 @@ export default function App() {
 
           <div className={'cards' + (idle ? '' : ' hide')}>
             {CARDS.map((c) => (
-              <div className="card" key={c.title}>
-                <div className="hatch" aria-hidden="true" />
-                <svg className="card-icon" aria-hidden="true" width="64" height="56" viewBox="0 0 64 56">
+              <button
+                className="card"
+                type="button"
+                key={c.title}
+                tabIndex={idle ? 0 : -1}
+                onClick={() => (c.pick ? pickFile(c.pick) : inputRef.current?.focus())}
+              >
+                <span className="hatch" aria-hidden="true" />
+                <svg className="card-icon" aria-hidden="true" width="56" height="49" viewBox="0 0 64 56">
                   {c.icon}
                 </svg>
-                <div className="card-title">{c.title}</div>
-                <div className="card-kicker">{c.kicker}</div>
-                <p className="card-text">{c.text}</p>
-                <div className="ink" aria-hidden="true" />
-              </div>
+                <span className="card-title">{c.title}</span>
+                <span className="card-hint">{c.hint}</span>
+                <span className="ink" aria-hidden="true" />
+              </button>
             ))}
           </div>
         </div>

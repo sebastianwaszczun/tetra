@@ -1,0 +1,89 @@
+# Skaner Biblioteki Reklam Meta. Każda wartość z opisem pochodzenia.
+
+[meta]
+wersja_api = "v27.0"        # źródło: wersja sprawdzona na żywo 2026-11-21
+kraj = "PL"                 # źródło: zadanie NASK dotyczy reklam w Polsce
+reklam_na_strone = 100      # źródło: maksimum przyjmowane przez ads_archive
+stron_na_zapytanie = 3      # źródło: start; wyniki są od najnowszych, starsze strony rzadko wnoszą nowe reklamy
+budzet_wywolan = 60         # źródło: start; zapas wobec limitu wywołań API na godzinę
+prog_zuzycia = 80           # źródło: start; procent z nagłówka x-business-use-case-usage, powyżej czekamy
+pauza_przy_zuzyciu_s = 60   # źródło: start
+maks_czekania_s = 300       # źródło: start; dłuższa blokada przerywa skan zamiast go wstrzymywać
+proby = 3                   # źródło: start
+limit_czasu_s = 60          # źródło: start
+
+[harmonogram]
+co_godzin = 3               # źródło: obserwacja 17-18.11, reklamy scamowe żyją 0-3 dni
+skan_przy_starcie = true    # źródło: start
+pierwsze_okno_dni = 3       # źródło: obserwacja 17-18.11, długość życia reklamy scamowej
+zapas_okna_dni = 1          # źródło: start; nakładka okien między skanami
+sprawdzanie_co_godzin = 24  # źródło: start; ponowne sprawdzenie, czy Meta zdjęła reklamę
+sprawdzanie_dni = 7         # źródło: start; jak długo wstecz sprawdzamy przeanalizowane reklamy
+
+[reguly]
+# źródło: start, frazy typowe dla zgłaszanych scamów; lista do przeglądu przez drużynę
+frazy = [
+    "pasywny dochód",
+    "zarabiaj",
+    "platforma inwestycyjna",
+    "inwestycja zysk",
+    "zarobki z domu",
+    "wywiad skandal",
+    "nie chcą, żebyś wiedział",
+    "lekarze ukrywają",
+    "Brzoska inwestycja",
+    "Olejnik wywiad",
+    "Morawiecki inwestycja",
+    "kryptowaluty zysk",
+]
+maks_fraz_z_wynikow = 10    # źródło: start
+wygasanie_fraz_dni = 7      # źródło: start; fraza bez trafień w tym czasie przestaje być używana
+# źródło: start; tytuły linków zbyt ogólne, żeby szukać po nich nowych reklam
+ogolne_tytuly = ["dowiedz się więcej", "kup teraz", "zamów teraz", "sprawdź", "zobacz więcej",
+                 "więcej informacji", "zapisz się", "learn more", "shop now"]
+
+[filtr]
+prog = 0.5                  # źródło: skan na żywo 2026-11-21 (1026 reklam): zwykłe reklamy z frazami zysku do ok. 0,45
+maks_do_analizy = 20        # źródło: czas potoku ok. 2-30 s na materiał
+prog_tropu = 0.6            # źródło: start; do tropu potrzebny też co najmniej jeden mocny sygnał
+reklam_strony = 10          # źródło: obserwacja 17-18.11, strony scamowe publikowały 12-47 reklam w 2-3 dni
+dni_swiezosci = 3           # źródło: obserwacja 17-18.11, długość życia reklamy scamowej
+# źródło: skan na żywo 2026-11-21; sygnały rzadkie u zwykłych reklamodawców – tylko one tworzą trop kampanii
+mocne_sygnaly = ["lista_cert", "osoba_i_narracja", "platnik", "strona_jak_media"]
+narracje_scamowe = ["fake_news_investment", "fake_news_scandal"]   # źródło: kategorie modułu tekstu
+# źródło: start; słowa w nazwie strony typowe dla podszywania się pod serwis informacyjny
+slowa_mediow = ["informacje", "wiadomości", "wiadomosci", "news", "24/7", "dziennik", "fakty", "raport",
+                "relacje", "portal", "gazeta", "telewizja", "redakcja", "aktualności"]
+
+[filtr.wagi]
+# Wynik = 1 - iloczyn(1 - waga) po sygnałach, które wystąpiły.
+# źródło: skan na żywo 2026-11-21 – narracja i presja występowały w 80-90% wyników fraz, więc ważą mało.
+lista_cert = 0.6
+osoba_i_narracja = 0.45
+platnik = 0.25
+strona_jak_media = 0.25
+osoba = 0.2
+spalanie_strony = 0.15
+narracja = 0.1
+presja_zysk = 0.1
+marka = 0.1
+nowa_strona = 0.1
+presja_inne = 0.05
+
+[analiza]
+url = "http://api:8000/analyze"   # źródło: usługa api w docker-compose; nadpisuje ADLIB_ANALYZE_URL
+limit_czasu_s = 300               # źródło: zimny start potoku ok. 30 s, z zapasem na OSINT
+
+[przechwyt]
+limit_czasu_ms = 30000      # źródło: start
+szerokosc = 600             # źródło: szerokość karty reklamy w podglądzie
+min_bok_px = 100            # źródło: start; mniejsze obrazki to ikony, nie kreacja
+
+[zdjecie]
+# źródło: komunikaty Mety w polach tekstowych zdjętych reklam, obserwacja 2026-11-18
+standardy = ["didn't follow our Advertising Standards"]
+konto_wylaczone = ["run by an account or Page we later disabled"]
+
+[cert]
+url = "https://hole.cert.pl/domains/v2/domains.txt"   # źródło: Lista Ostrzeżeń CERT Polska
+odswiezanie_godzin = 24                                 # źródło: start

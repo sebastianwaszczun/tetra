@@ -73,8 +73,6 @@ services:
       - api
     environment:
       DOMAIN: ${DOMAIN}
-      BASIC_AUTH_USER: ${BASIC_AUTH_USER:?ustaw BASIC_AUTH_USER w .env}
-      BASIC_AUTH_HASH: ${BASIC_AUTH_HASH:?ustaw BASIC_AUTH_HASH w .env}
     ports:
       - "80:80"
       - "443:443"

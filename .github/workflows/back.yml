@@ -45,8 +45,6 @@ jobs:
       - name: Compose
         env:
           DOMAIN: example.com
-          BASIC_AUTH_USER: ci
-          BASIC_AUTH_HASH: x
           POSTGRES_PASSWORD: ci
           NEO4J_PASSWORD: ci
         run: docker compose -f docker-compose.prod.yml config -q

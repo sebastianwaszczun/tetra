@@ -9,3 +9,4 @@ __pycache__/
 
 # materiały od organizatorów (treść zadania NASK) – tylko lokalnie
 docs/tresc_zadania_nask.pdf
+.venv/

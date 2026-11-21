@@ -1,0 +1,5 @@
+These font files are unmodified subsets downloaded from Google Fonts and are
+licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org).
+
+Gloria Hallelujah — Copyright (c) 2010, Kimberly Geswein (kimberlygeswein.com)
+Patrick Hand      — Copyright (c) 2010-2012 Patrick Wagesreiter (mail@patrickwagesreiter.at)

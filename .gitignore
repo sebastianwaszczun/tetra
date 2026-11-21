@@ -4,9 +4,14 @@ data/*
 __pycache__/
 .ipynb_checkpoints/
 
-# archiwa z danymi (np. ___BACKUP.zip) nie trafiają do repo
+# Dane NASK nie mogą trafić do repo (regulamin: zakaz publicznego rozpowszechniania)
+DANE/
+DANE*.zip
+do_udostępnienia/
 *.zip
 
 # materiały od organizatorów (treść zadania NASK) – tylko lokalnie
 docs/tresc_zadania_nask.pdf
 .venv/
+# Dokumentacja (.md) zostaje lokalnie, do repo trafia tylko kod.
+*.md

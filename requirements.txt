@@ -1,7 +1,7 @@
 # --- Twarze ---
 insightface==0.7.3          # ArcFace embeddingi (512-d), detekcja twarzy
 onnxruntime>=1.17           # backend dla insightface (CPU)
-facetorch                   # deepfake, emocje, landmarki (modele pobiera przy 1. uruchomieniu)
+facetorch==0.6.2             # deepfake i emocje, zgodne z torch 2.3.1
 opencv-python-headless
 # MagFace nie ma pakietu pip – patrz README (repo + wagi, scripts/download_models.py)
 
@@ -64,3 +64,5 @@ python-dotenv
 jupyterlab
 ipywidgets
 matplotlib
+pytest
+pillow-heif

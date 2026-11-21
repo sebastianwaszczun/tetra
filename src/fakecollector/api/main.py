@@ -8,6 +8,7 @@ Dokumentacja interaktywna: http://localhost:8000/docs
 from __future__ import annotations
 
 import os
+import threading
 from typing import Any, Literal, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -154,6 +155,65 @@ def image_compare(
     potok = _image_module()
     limit = potok.limit_bajtow()
     return potok.porownaj_pliki(_read_image(a, limit), _read_image(b, limit))
+
+
+# ----------------------------------------------------------------------------- skaner Biblioteki Reklam
+
+_skaner_obj = None
+_skaner_blokada = threading.Lock()
+
+
+def _skaner():
+    """Import i połączenie z bazą przy pierwszym użyciu: brak tokenu albo bazy nie wyłącza reszty API."""
+    global _skaner_obj
+    with _skaner_blokada:
+        if _skaner_obj is None:
+            from fakecollector.adlib import Skaner
+            _skaner_obj = Skaner.z_srodowiska()
+        return _skaner_obj
+
+
+@app.post("/adlib/scan", status_code=202, tags=["skaner Biblioteki Reklam"],
+          summary="Skan Biblioteki Reklam Meta teraz (w tle)")
+def adlib_scan(
+    fraza: Optional[str] = None,
+    limit: Optional[int] = None,
+) -> dict[str, Any]:
+    """Uruchamia ten sam skan co harmonogram. `fraza` zastępuje reguły jednym zapytaniem,
+    `limit` ogranicza liczbę reklam wysłanych do analizy. Postęp: GET /adlib/status."""
+    skaner = _skaner()
+    if skaner.magazyn.trwajacy_skan():
+        raise HTTPException(409, "Skan już trwa – sprawdź GET /adlib/status.")
+    threading.Thread(target=skaner.skanuj, kwargs={"wyzwalacz": "api", "fraza": fraza, "limit": limit},
+                     daemon=True).start()
+    return {"status": "uruchomiony", "postep": "/adlib/status", "reklamy": "/adlib/ads"}
+
+
+@app.get("/adlib/status", tags=["skaner Biblioteki Reklam"], summary="Stan skanera: ostatnie skany, liczby, token")
+def adlib_status() -> dict[str, Any]:
+    return _skaner().status()
+
+
+@app.post("/adlib/tropy", tags=["skaner Biblioteki Reklam"], summary="Dodaj trop: stronę albo frazę do obserwacji")
+def adlib_trop(
+    rodzaj: Literal["strona", "fraza"],
+    wartosc: str,
+    opis: str = "",
+) -> dict[str, Any]:
+    """`strona` to page_id reklamodawcy z Biblioteki Reklam (każda jego nowa reklama trafi do analizy),
+    `fraza` to dodatkowe słowo do wyszukiwania. Działa od następnego skanu."""
+    wartosc = wartosc.strip()
+    if not wartosc or (rodzaj == "strona" and not wartosc.isdigit()):
+        raise HTTPException(400, "Strona to numeryczne page_id, fraza nie może być pusta.")
+    _skaner().magazyn.dodaj_trop(rodzaj, wartosc, "reczny", opis)
+    return {"dodano": {"rodzaj": rodzaj, "wartosc": wartosc}}
+
+
+@app.get("/adlib/ads", tags=["skaner Biblioteki Reklam"], summary="Reklamy znalezione przez skaner")
+def adlib_ads(status: Optional[str] = None, limit: int = 50) -> list[dict[str, Any]]:
+    """Statusy: kandydat, pominieta, w_analizie, przeanalizowana, blad. Przy każdej reklamie wynik filtra,
+    powody i podsumowanie analizy z id zgłoszenia."""
+    return _skaner().magazyn.reklamy(status, min(max(limit, 1), 500))
 
 
 # ----------------------------------------------------------------------------- preprocessing

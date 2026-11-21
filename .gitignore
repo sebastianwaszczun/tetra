@@ -3,3 +3,11 @@ data/*
 !data/.gitkeep
 __pycache__/
 .ipynb_checkpoints/
+
+# Dane NASK nie mogą trafić do repo (regulamin: zakaz publicznego rozpowszechniania)
+DANE/
+DANE*.zip
+do_udostępnienia/
+
+# Dokumentacja (.md) zostaje lokalnie, do repo trafia tylko kod.
+*.md

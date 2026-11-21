@@ -1,0 +1,216 @@
+[wczytywanie]
+maks_pikseli = 50000000 # źródło: założenie limitu dekodowania niezaufanego obrazu
+maks_bajtow = 30000000 # źródło: założenie limitu dekodowania niezaufanego obrazu (30 MB)
+
+[przygotowanie]
+maks_udzial_ramki = 0.25 # źródło: założenie odcinania, maksymalna część każdego boku
+dominujacy_kolor = 0.85 # źródło: założenie filtra, minimalny udział dominującego koloru
+min_bok_px = 64 # źródło: założenie filtra, minimalny krótszy bok do porównania
+bok_probki_px = 256 # źródło: założenie filtra treści, ograniczenie kosztu pomiaru treści
+prog_gradientu = 24 # źródło: założenie filtra treści, różnica jasności sąsiadów w skali 0–255
+maks_gestosc_krawedzi = 0.015 # źródło: założenie filtra treści, górna granica udziału wyraźnych różnic
+maks_niski_kontrast = 12.0 # źródło: założenie filtra treści, odchylenie jasności w skali 0–255
+
+[hashe]
+T_p = 4 # źródło: kalibracja hashy, 2026-11-21, obrazy stron NASK, 3570 par kontrolnych, zapas 1 bit
+T_d = 14 # źródło: kalibracja hashy, 2026-11-21, obrazy stron NASK, 935 transformacji, zapas 1 bit
+srodek = 0.80 # źródło: założenie wariantu centralnego, 80% wymiarów wejścia
+zapas_bit = 1 # źródło: reguła kalibracji hashy, 1 bit zapasu przy kontroli negatywów
+T_p_sporne = 8 # źródło: reguła przeglądu par, próg wyszukiwania kandydatów do ręcznej kontroli
+T_d_sporne = 10 # źródło: reguła przeglądu par, próg wyszukiwania kandydatów do ręcznej kontroli
+
+[twarze]
+tryb = "oba" # źródło: porównanie modeli twarzy, 2026-11-21, ArcFace główny i SFace drugi głos
+jakosc = "magface" # źródło: sprawdzian miar jakości twarzy, 2026-11-21, ujemne ρ dla JPEG i pozostałych degradacji
+magface_tylko_norma = true # źródło: sprawdzian miar jakości twarzy, 2026-11-21, norma MagFace jako składnik jakości
+prog_iou_glosow = 0.40 # źródło: założenie analizy twarzy, minimalne IoU do zestawienia detekcji obu modeli
+min_bok_px = 24 # źródło: założenie detekcji, minimalny krótszy bok ramki twarzy
+maks_liczba = 20 # źródło: założenie detekcji, limit największych twarzy na obraz
+powiekszenie = 2 # źródło: założenie detekcji, skala drugiego przebiegu dla małych twarzy
+bok_detekcji_px = 640 # źródło: założenie detekcji, dłuższy bok wejścia do pierwszego przebiegu
+prog_nms = 0.40 # źródło: założenie detekcji, IoU do scalenia detekcji
+bok_dobrej_px = 80 # źródło: założenie miary jakości, nasycenie składowej rozmiaru
+percentyle_ostrosci_dobrej = [25, 0, 5, 10, 50, 75] # źródło: kalibracja ostrości i jakości twarzy, kandydaci z rozkładu ostrości 19 oryginałów
+watki_onnx = 4 # źródło: założenie analizy twarzy, liczba wątków CPU na sesję ONNX
+udzial_zapasu_marginesu = 0.25 # źródło: metoda kalibracji nazwiska, część odstępu między marginesami negatywów i trafień
+
+[twarze.magface]
+norma_min = 10.0 # źródło: Meng i in., MagFace, CVPR 2021, sekcja 4.1, dolna granica normy w treningu
+norma_max = 110.0 # źródło: Meng i in., MagFace, CVPR 2021, sekcja 4.1, górna granica normy w treningu
+percentyle_calosci = [5, 95] # źródło: sprawdzian alternatywnej miary, środkowe 90% rozkładu norm na oryginałach i wariantach
+
+[twarze.magface.calosc]
+norma_min = 23.80 # źródło: kalibracja jakości twarzy, 2026-11-21, P5 ze 171 norm 19 referencji i ich wariantów
+norma_max = 31.07 # źródło: kalibracja jakości twarzy, 2026-11-21, P95 ze 171 norm 19 referencji i ich wariantów
+prog_jakosci = 0.3889 # źródło: kalibracja jakości twarzy, 2026-11-21, minimum jakości 19/19 oryginałów po skalowaniu P5–P95
+
+[twarze.buffalo_l]
+prog_detekcji = 0.50 # źródło: założenie detekcji, punkt startowy detektora SCRFD
+norma_dobrej = 24.0 # źródło: założenie miary jakości, skala normy wektora ArcFace
+ostrosc_dobrej = 125.7 # źródło: kalibracja ostrości i jakości twarzy, 2026-11-21, P0 wariancji Laplasjanu 19 oryginałów wyrównanych do 112 × 112
+prog_jakosci = 0.6177 # źródło: kalibracja ostrości i jakości twarzy, 2026-11-21, minimum jakości 19 oryginałów przy P0, w trybie pojedynczym i łączonym
+prog_jakosci_zastepcza = 0.50 # źródło: założenie miary jakości, minimum dla miary bez MagFace
+T_osoba = 0.3894 # źródło: kalibracja twarzy, 2026-11-21, 19 referencji w sprawdzianie „wyjmij jedno” i 2 kontrole spoza bazy
+margines = 0.2101 # źródło: kalibracja twarzy, 2026-11-21, 19 referencji w sprawdzianie „wyjmij jedno” i 2 kontrole spoza bazy
+T_f = 0.3735 # źródło: kalibracja podobieństwa twarzy, 2026-11-21, pary z 19 przyjętych referencji i 2 kontrole
+wersja_kalibracji = "5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91+4c06341c33c2ca1f86781dab0e829f88ad5b64be9fba56e56bc9ebdefc619e43"
+
+[twarze.yunet_sface]
+prog_detekcji = 0.80 # źródło: kalibracja twarzy, 2026-11-21, 11 kreacji, dodatkowa detekcja 0.683, pozostałe od 0.912
+norma_dobrej = 8.0 # źródło: założenie miary jakości, skala normy wektora SFace
+ostrosc_dobrej = 104.6 # źródło: kalibracja ostrości i jakości twarzy, 2026-11-21, P0 wariancji Laplasjanu 19 oryginałów wyrównanych do 112 × 112
+prog_jakosci = 0.6364 # źródło: kalibracja ostrości i jakości twarzy, 2026-11-21, minimum jakości 19 oryginałów przy P0, w trybie pojedynczym i łączonym
+prog_jakosci_zastepcza = 0.50 # źródło: założenie miary jakości, minimum dla miary bez MagFace
+T_osoba = 0.4359 # źródło: kalibracja twarzy, 2026-11-21, 19 referencji w sprawdzianie „wyjmij jedno” i 2 kontrole spoza bazy
+margines = 0.2039 # źródło: kalibracja twarzy, 2026-11-21, 19 referencji w sprawdzianie „wyjmij jedno” i 2 kontrole spoza bazy
+T_f = 0.3836 # źródło: kalibracja podobieństwa twarzy, 2026-11-21, pary z 19 przyjętych referencji i 2 kontrole
+wersja_kalibracji = "ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0+0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
+
+[facetorch]
+maks_twarzy_facetorch = 5 # źródło: założenie FaceTorch, limit kosztu CPU na kreację
+manifest = "/models/obraz/facetorch.json"
+
+[qr]
+powiekszenia = [2, 3] # źródło: założenie czytnika QR, próby powiększenia po próbie w oryginale
+prog_iou_duplikatu = 0.40 # źródło: założenie czytnika QR, scalenie zgodnych odczytów czytników
+minimalny_modul_px = 1 # źródło: pomiar QR, 2026-11-21, czysty kod syntetyczny po powiększeniu 2×
+
+[dowody]
+identyczny_plik = "silny" # źródło: reguła siły dowodów, zgodność bajtów zasobu
+duplikat_kreacji = "silny" # źródło: reguła siły dowodów, zgodność dwóch hashy percepcyjnych w tym samym wariancie
+ten_sam_kadr = "silny" # źródło: reguła siły dowodów, zgodność geometrii kadru
+ta_sama_twarz = "silny" # źródło: reguła siły dowodów, zgodne dopasowanie modeli twarzy
+wspolny_qr = "silny" # źródło: reguła siły dowodów, identyczna znormalizowana treść kodu
+podobny_wyglad = "sredni" # źródło: reguła siły dowodów, podobieństwo wyglądu możliwe przy różnych kreacjach
+wspolne_elementy_szablonu = "sredni" # źródło: reguła siły dowodów, wspólne wyróżniające elementy
+ta_sama_osoba = "slaby" # źródło: reguła siły dowodów, znana osoba może wystąpić w różnych kampaniach
+wspolne_logo = "slaby" # źródło: reguła siły dowodów, marka może wystąpić w różnych kampaniach
+
+[orb]
+bok_px = 720 # źródło: założenie ORB, limit rastra dla ORB
+maks_punktow = 1600 # źródło: założenie ORB, limit ekstrakcji i dopasowania
+iloraz_hamminga = 0.76 # źródło: sprawdzian ORB, próba syntetyczna z ziarnami 100–107, filtr sąsiadów przed RANSAC
+blad_ransac_px = 3.0 # źródło: sprawdzian ORB, próba syntetyczna 100–107, tolerancja na rastrze ORB
+min_punkty = 18 # źródło: kalibracja ORB, 2026-11-21, 3 × maksimum 6 dla rozłącznych scen 100–107
+min_udzial_punktow = 0.50 # źródło: kalibracja ORB, 2026-11-21, próg z zapasem poniżej trafnych homografii w scenach 100–107
+min_pokrycie = 0.13 # źródło: kalibracja ORB, 2026-11-21, dodatnie pokrycie co najmniej 0,49 w scenach 100–107, zapas dla mniejszych wstawek
+min_rozrzut = 0.16 # źródło: kalibracja ORB, 2026-11-21, małe wspólne fragmenty poniżej 0,059, zgodne kadry powyżej 0,419
+min_skala = 0.25 # źródło: sprawdzian ORB, wariant pomniejszenia do 25%, geometria kontrolna 100–107
+maks_skala = 4.0 # źródło: sprawdzian ORB, odwrotność skali 25%, geometria kontrolna 100–107
+maks_znieksztalcenie = 2.5 # źródło: kalibracja ORB, 2026-11-21, maksimum 1,284 zgodnych perspektyw 100–107 z zapasem
+zapas_hash = 12 # źródło: założenie ORB, dopuszczalna nadwyżka bitów nad progami duplikatu
+zapas_cos = 0.12 # źródło: założenie ORB, pas kandydatów poniżej progu wyglądu
+
+[partie]
+obrazy_na_partie = 4 # źródło: założenie analizy partii, limit grupy dla enkoderów na CPU
+maks_stosunek_proporcji = 1.04 # źródło: założenie analizy partii, ogranicza dziedziczenie prostokątów do zgodnej geometrii
+
+[proba_generalna]
+klatki_na_film = 3 # źródło: założenie próby generalnej, równomierna próbka z pliku filmu
+min_przykladow_elementu = 2 # źródło: założenie próby generalnej, co najmniej dwie obserwacje każdej klasy w kampaniach treningowych
+
+[szablon]
+min_wspolne_elementy = 2 # źródło: założenie reguły szablonu, co najmniej dwa wyróżniające elementy
+dowod_elementow = true # źródło: reguła szablonu, tylko elementy z wiarygodną kalibracją, bez pospolitych
+elementy = [
+    "plakietka_na_zywo", "twarz_okragla_ramka", "twarz_wstawka",
+    "czerwona_strzalka", "pasek_tekst_dol", "przycisk_odtwarzania",
+    "studio_prezenter", "ulica_samochody_z_gory", "banknoty",
+    "telefon_z_aplikacja", "sala_parlamentu", "luksusowy_dom_samochod", "znaczek_ai",
+]
+pospolite = ["pasek_tekst_dol", "przycisk_odtwarzania"]
+marki = ["TVN24", "Polsat News", "TVP Info", "Interia", "Onet", "WP", "Gazeta.pl", "InPost", "App Store", "Google Play"]
+
+[wyglad]
+model = "clip" # źródło: porównanie enkoderów, 2026-11-21, 13 kreacji i 11 par, wyniki i czas dla dopełnienia
+model_logo = "siglip2" # źródło: ocena logo z odłożeniem zgłoszeń, 2026-11-21, 3/3 TVN24 i zero fałszywych w odłożonych zgłoszeniach
+zapas_T_w = 0.02 # źródło: kalibracja podobieństwa wyglądu, 2026-11-21, margines nad najwyższą parą różną przed zaokrągleniem
+szerokosc_rogu = 0.40 # źródło: założenie geometrii wycinków, udział szerokości
+wysokosc_rogu = 0.40 # źródło: założenie geometrii wycinków, udział wysokości
+wysokosc_pasa = 0.30 # źródło: założenie geometrii wycinków, udział wysokości
+
+[wyglad.wycinki_logo]
+szerokosc_rogu = 0.22 # źródło: kalibracja geometrii logo na 13 kreacjach, 2026-11-21
+wysokosc_rogu = 0.22 # źródło: kalibracja geometrii logo na 13 kreacjach, 2026-11-21
+wysokosc_pasa = 0.16 # źródło: kalibracja geometrii logo na 13 kreacjach, 2026-11-21
+
+[wyglad.clip]
+T_w = 0.68 # źródło: kalibracja podobieństwa wyglądu, 2026-11-21, maks. 0.653822 wśród 48 mierzalnych par różnych zgłoszeń
+wersja_T_w = "40d365715913c9da98579312b702a82c18be219cc2a73407c4526f58eba950af"
+prog_negatywu_tvn24 = 0.50 # źródło: założenie filtra logo, próba kontrolna LIVE bez marki
+elementy_do_usuniecia = ["plakietka_na_zywo","twarz_okragla_ramka","twarz_wstawka","pasek_tekst_dol","przycisk_odtwarzania"]
+elementy_mala_proba = ["czerwona_strzalka","banknoty","telefon_z_aplikacja","sala_parlamentu","luksusowy_dom_samochod","znaczek_ai"]
+
+[wyglad.clip.elementy]
+# plakietka_na_zywo: brak progu z trafieniem i zerem fałszywych na zbiorze
+# twarz_okragla_ramka: brak progu z trafieniem i zerem fałszywych na zbiorze
+# twarz_wstawka: brak progu z trafieniem i zerem fałszywych na zbiorze
+czerwona_strzalka = 0.2227 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+pasek_tekst_dol = 0.9807 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/7 trafień
+przycisk_odtwarzania = 0.7055 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/4 trafień
+studio_prezenter = 0.2322 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 3/4 trafień
+ulica_samochody_z_gory = 0.04554 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 2/2 trafień
+banknoty = 0.4630 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+telefon_z_aplikacja = 0.4342 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+sala_parlamentu = 0.1516 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+luksusowy_dom_samochod = 0.3028 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+znaczek_ai = 0.3949 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+
+[wyglad.clip.logo]
+# Marki spoza tabeli nie miały pozytywnych przykładów w zbiorze.
+"TVN24" = 0.7147 # źródło: kalibracja logo, 2026-11-21, 13 kreacji, dopełnienie, same opisy
+"Polsat News" = 0.8433 # źródło: kalibracja logo, 2026-11-21, 13 kreacji, dopełnienie, same opisy
+
+[wyglad.siglip2]
+T_w = 0.77 # źródło: kalibracja podobieństwa wyglądu, 2026-11-21, maks. 0.748716 wśród 48 mierzalnych par różnych zgłoszeń
+wersja_T_w = "eee10eff6dd8cabae2d7f379d4e8cfcd352030aa"
+prog_negatywu_tvn24 = 0.50 # źródło: założenie filtra logo, próba kontrolna LIVE bez marki
+elementy_do_usuniecia = ["plakietka_na_zywo","twarz_okragla_ramka","twarz_wstawka","czerwona_strzalka","pasek_tekst_dol","przycisk_odtwarzania","telefon_z_aplikacja"]
+elementy_mala_proba = ["banknoty","sala_parlamentu","luksusowy_dom_samochod","znaczek_ai"]
+
+[wyglad.siglip2.elementy]
+plakietka_na_zywo = 0.0006112 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/2 trafień
+# twarz_okragla_ramka: brak progu z trafieniem i zerem fałszywych na zbiorze
+# twarz_wstawka: brak progu z trafieniem i zerem fałszywych na zbiorze
+# czerwona_strzalka: brak progu z trafieniem i zerem fałszywych na zbiorze
+# pasek_tekst_dol: brak progu z trafieniem i zerem fałszywych na zbiorze
+przycisk_odtwarzania = 0.05126 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/4 trafień
+studio_prezenter = 0.002133 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 4/4 trafień
+ulica_samochody_z_gory = 0.0002292 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 2/2 trafień
+banknoty = 0.004885 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+# telefon_z_aplikacja: brak progu z trafieniem i zerem fałszywych na zbiorze
+sala_parlamentu = 0.003850 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+luksusowy_dom_samochod = 0.0008866 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+znaczek_ai = 0.05822 # źródło: kalibracja elementów szablonu, 2026-11-21, 13 kreacji, dopełnienie, 1/1 trafień
+
+[wyglad.siglip2.logo]
+# Marki spoza tabeli nie miały pozytywnych przykładów w zbiorze.
+"TVN24" = 0.4997 # źródło: kalibracja logo, 2026-11-21, 13 kreacji, dopełnienie, same opisy
+"Polsat News" = 0.5128 # źródło: kalibracja logo, 2026-11-21, 13 kreacji, dopełnienie, same opisy
+
+[wyglad.opisy_elementow]
+plakietka_na_zywo = ["a red live badge reading live or na zywo","a red rectangle with white live broadcast lettering"]
+twarz_okragla_ramka = ["a face inside a circular portrait frame","a small round portrait inset over the main picture"]
+twarz_wstawka = ["a face in a rectangular inset video frame","a small separate rectangle showing a person's face over a larger picture"]
+czerwona_strzalka = ["a bright red arrow pointing at part of the image","a red graphic pointer overlaid on a picture"]
+pasek_tekst_dol = ["a text banner or caption bar along the bottom edge","a lower third news caption with text near the bottom"]
+przycisk_odtwarzania = ["a triangular play button over a video thumbnail","a video play icon overlaid near the center"]
+studio_prezenter = ["a television news presenter in a broadcast studio","a news anchor at a desk in a TV studio"]
+ulica_samochody_z_gory = ["cars on a street seen from above","an overhead view of road traffic with cars"]
+banknoty = ["a group of paper banknotes or stacks of cash","paper currency bills displayed in a picture"]
+telefon_z_aplikacja = ["a smartphone displaying an app interface","a mobile phone with an application open on its screen"]
+sala_parlamentu = ["the interior of a parliament chamber","rows of seats in a legislative assembly hall"]
+luksusowy_dom_samochod = ["a luxury house or a luxury car","an expensive modern mansion or a high-end sports car"]
+znaczek_ai = ["a small AI badge marked with the letters AI","a graphic label indicating AI-generated content"]
+
+[wyglad.opisy_logo]
+"TVN24" = ["the TVN24 channel logo showing the number 24 and TVN branding","a TVN24 television station emblem"]
+"Polsat News" = ["the Polsat News television channel logo","a Polsat News station emblem with the words Polsat News"]
+"TVP Info" = ["the TVP Info television channel logo","a TVP Info channel symbol with the TVP letter blocks"]
+"Interia" = ["the Interia portal logo","the Interia branded wordmark"]
+"Onet" = ["the Onet internet portal logo","the Onet wordmark with its yellow emblem"]
+"WP" = ["the Wirtualna Polska WP portal logo","the WP internet portal emblem"]
+"Gazeta.pl" = ["the Gazeta.pl internet portal logo","the Gazeta.pl branded wordmark"]
+"InPost" = ["the InPost parcel delivery logo","the black and yellow InPost brand emblem"]
+"App Store" = ["the Apple App Store logo","the blue App Store symbol with a white stylized letter A"]
+"Google Play" = ["the Google Play store logo","the multicolored triangular Google Play icon"]

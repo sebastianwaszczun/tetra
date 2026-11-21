@@ -66,6 +66,8 @@ services:
       - ./src:/workspace/src          # kod zespołu
       - ./data:/workspace/data        # dane (np. rozpakowany ___BACKUP.zip)
       - ./scripts:/workspace/scripts
+      - ./tests:/workspace/tests
+      - ./config:/workspace/config
       - models:/models                # cache modeli – pobierane raz, współdzielone
     shm_size: "2gb"
 

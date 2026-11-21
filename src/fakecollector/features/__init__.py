@@ -1,0 +1,1 @@
+"""Moduły ekstrakcji cech materiałów."""

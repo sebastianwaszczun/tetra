@@ -1,0 +1,59 @@
+name: front
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "front/**"
+      - "deploy/**"
+      - ".github/workflows/front.yml"
+  pull_request:
+    paths:
+      - "front/**"
+      - "deploy/**"
+      - ".github/workflows/front.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.11.0"
+      - name: Build
+        working-directory: front
+        env:
+          VITE_API_URL: /api
+        run: |
+          npm install --no-audit --no-fund
+          npx vite build
+      - name: Caddyfile
+        run: |
+          docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            -e DOMAIN=example.com -e BASIC_AUTH_USER=ci \
+            -e 'BASIC_AUTH_HASH=$2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx4IjWJPDhjvG' \
+            caddy:2.8.4 caddy validate --config /etc/caddy/Caddyfile
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && vars.VPS_HOST != ''
+    runs-on: ubuntu-24.04
+    steps:
+      - name: SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Deploy web
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
+            'set -e; cd ~/tetra; git pull --ff-only; docker compose up -d --build web; docker image prune -f'

@@ -97,6 +97,7 @@ services:
       - ./src:/workspace/src
       - ./modules:/workspace/modules
       - ./data:/workspace/data
+      - ./config:/workspace/config
       - models:/models
 
 volumes:

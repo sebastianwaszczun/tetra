@@ -7,7 +7,6 @@ Dokumentacja interaktywna: http://localhost:8000/docs
 """
 from __future__ import annotations
 
-import json
 import os
 from typing import Any, Literal, Optional
 
@@ -104,6 +103,56 @@ def analyze_text(req: TextAnalyzeRequest) -> TextAnalyzeResponse:
     return TextAnalyzeResponse(features=features.to_dict(with_vectors=req.with_vectors), page=page)
 
 
+ImageRole = Literal["kreacja", "obrazek_strony", "klatka", "zrzut_caly"]
+
+
+def _image_module():
+    """Import przy pierwszym użyciu: brak zależności obrazu (opencv, imagehash…) nie wyłącza całego API."""
+    from fakecollector.features.image import potok
+    return potok
+
+
+def _read_image(f: UploadFile, limit: int) -> tuple[str, bytes]:
+    data = f.file.read(limit + 1)
+    if len(data) > limit:
+        raise HTTPException(413, f"Obraz {f.filename} jest za duży (limit {limit // 1_000_000} MB).")
+    if not data:
+        raise HTTPException(400, f"Pusty plik {f.filename}.")
+    return f.filename or "obraz", data
+
+
+@app.post("/image/analyze", tags=["moduł obrazu"], summary="Cechy jednego obrazu (hashe, wygląd, logo, twarze, QR)")
+def image_analyze(
+    file: UploadFile = File(..., description="Obraz: PNG, JPEG, WEBP, GIF, BMP, HEIC, AVIF."),
+    rola: ImageRole = Form("kreacja", description="Czym jest obraz: kreacja reklamy, obrazek ze strony, klatka, zrzut."),
+    with_vectors: bool = Form(False, description="Czy zwrócić wektory CLIP i twarzy (do bazy, duża odpowiedź)."),
+) -> dict[str, Any]:
+    """Zwraca skrót do porównań (sha256, pHash, osoby, logo, QR) i pełne cechy w polu `cechy`.
+
+    Pierwsze wywołanie ładuje modele z /models/obraz (CLIP, SigLIP2, ArcFace…). Brak wag nie jest błędem:
+    trafia do `cechy.braki`, a hashe i QR są liczone dalej.
+    """
+    potok = _image_module()
+    name, data = _read_image(file, potok.limit_bajtow())
+    result = potok.analizuj_plik(data, name, rola, with_vectors)
+    if result["sha256"] is None:
+        powod = next((b["powod"] for b in result["cechy"]["braki"] if b["skladnik"] == "wczytywanie"), "nieznany format")
+        raise HTTPException(415, f"{name}: {powod}")
+    return result
+
+
+@app.post("/image/compare", tags=["moduł obrazu"], summary="Porównanie dwóch obrazów (dowody z siłą)")
+def image_compare(
+    a: UploadFile = File(..., description="Pierwszy obraz."),
+    b: UploadFile = File(..., description="Drugi obraz."),
+) -> dict[str, Any]:
+    """Dowody: identyczny plik, duplikat kreacji, ten sam kadr, podobny wygląd, wspólny szablon,
+    ta sama osoba / twarz, wspólne logo, wspólny QR – każdy z siłą (silny/średni/słaby) i uzasadnieniem."""
+    potok = _image_module()
+    limit = potok.limit_bajtow()
+    return potok.porownaj_pliki(_read_image(a, limit), _read_image(b, limit))
+
+
 # ----------------------------------------------------------------------------- preprocessing
 
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
@@ -119,6 +168,8 @@ def analyze(
                                          "Wydłuża odpowiedź o kilka–kilkanaście sekund."),
     av: bool = Form(True, description="Czy analizować wideo i audio (głos, dźwięk, obraz, napisy)."),
     asr: bool = Form(True, description="Czy robić transkrypcję mowy (najwolniejsza część, ~1 min na film)."),
+    image: bool = Form(True, description="Moduł obrazu: zrzuty, obrazy ze strony i klatki wideo "
+                                         "(hashe, wygląd, logo, twarze lektora/celebryty, QR)."),
 ) -> dict[str, Any]:
     """Preprocessing: rozkłada materiał na składniki i mówi, który moduł co dostaje.
 
@@ -157,6 +208,12 @@ def analyze(
         except Exception as exc:  # awaria modułu AV nie może zabrać reszty wyniku
             result["av_features"] = None
             result["av_error"] = f"{exc.__class__.__name__}: {exc}"
+    if image and inc.for_module("image"):
+        try:
+            result["image_features"] = _image_module().extract(inc)
+        except Exception as exc:
+            result["image_features"] = None
+            result["image_error"] = f"{exc.__class__.__name__}: {exc}"
     if text_features and inc.text.strip():
         origin = inc.text_origin[0] if inc.text_origin else "html"
         feats = text_module.analyze_text(inc.text, origin=origin, title=inc.title)
@@ -164,21 +221,7 @@ def analyze(
     if osint:
         try:
             result["osint"] = run_osint(inc, enrich=True)
-        except Exception as exc:  # awaria OSINT nie może zabrać reszty wyniku
+        except Exception as exc:
             result["osint"] = None
             result["osint_error"] = f"{exc.__class__.__name__}: {exc}"
-    _dump_response(result, inc.id)   # TYMCZASOWE: podgląd odpowiedzi w pliku na pulpicie
     return result
-
-
-def _dump_response(result: dict[str, Any], incident_id: str) -> None:
-    """TYMCZASOWE: zapisuje pełną odpowiedź /analyze do ~/Desktop/analyze_<czas>_<id>.txt."""
-    from datetime import datetime
-    from pathlib import Path
-    try:
-        out = Path(os.environ.get("ANALYZE_DUMP_DIR", Path.home() / "Desktop"))
-        out.mkdir(parents=True, exist_ok=True)
-        name = f"analyze_{datetime.now():%Y%m%d_%H%M%S}_{incident_id}.txt"
-        (out / name).write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
-    except OSError:
-        pass   # zapis podglądu nie może zepsuć odpowiedzi

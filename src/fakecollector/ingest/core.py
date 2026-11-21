@@ -193,7 +193,7 @@ def _video(inc: Incident, value: str | Path, o: Options, source: str = "input") 
         if audio:
             inc.add(AUDIO, audio, source="video", video=str(value))
     for frame in v.extract_frames(value, out, info.get("duration") or 0):
-        inc.add(FRAME, frame, source="video", video=str(value))
+        inc.add(FRAME, frame, source="video", video=str(value), duration=info.get("duration") or 0)
 
 
 def _audio(inc: Incident, value: str | Path, o: Options, source: str = "input") -> None:
@@ -367,7 +367,7 @@ def _hls_into(inc: Incident, folder: Path, parts: list[Path], o: Options, source
             if audio:
                 inc.add(AUDIO, audio, source="video", video=str(out))
         for frame in v.extract_frames(out, out_dir, info.get("duration") or 0):
-            inc.add(FRAME, frame, source="video", video=str(out))
+            inc.add(FRAME, frame, source="video", video=str(out), duration=info.get("duration") or 0)
 
 
 def _load_folder(inc: Incident, root: Path, o: Options, source: str) -> None:

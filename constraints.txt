@@ -8,7 +8,7 @@ numpy<2
 # Pakiety z epoki torch 2.3 / numpy 1.x – zgodny zestaw, żeby pip nie szukał godzinami.
 transformers>=4.40,<4.47
 sentence-transformers>=3.0,<3.4
-open_clip_torch>=2.24,<2.30
+open_clip_torch>=2.32,<2.33
 speechbrain>=1.0,<1.1
 timm<1.1
 opencv-python-headless<4.11

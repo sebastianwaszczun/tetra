@@ -22,7 +22,7 @@ from .wektor import NAZWY_MODELI, pobierz_model
 from .zbierz import zbierz
 
 _ETAPY_WYGLADU = ("wektor", "elementy_szablonu", "logo_obraz")
-_BLEDY_MODELU = (OSError, ValueError, RuntimeError, ImportError, KeyError)
+_BLEDY_MODELU = (OSError, ValueError, RuntimeError, ImportError, KeyError, AssertionError)
 
 
 class PolaRekordu(TypedDict):

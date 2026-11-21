@@ -24,6 +24,7 @@ librosa
 # --- Infrastruktura / OSINT ---
 requests
 httpx
+apscheduler                 # harmonogram skanera Biblioteki Reklam
 beautifulsoup4
 lxml
 tldextract

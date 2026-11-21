@@ -1,0 +1,34 @@
+# Marki, pod które podszywają się fałszywe reklamy (media, banki, instytucje, sklepy).
+# Format: Nazwa | wyrażenie regularne (małe litery)
+Gazeta.pl | gazeta\.pl|gazety\.pl
+TVN24 | tvn\s?24
+TVN | \btvn\b
+Polsat | polsat\w*
+Onet | onet\w*
+Interia | interi\w*
+WP.pl | wp\.pl|wirtualn\w* polsk\w*
+Money.pl | money\.pl
+Business Insider | business insider
+Fakt | \bfakt\.pl\b|\bfaktu\b
+Rzeczpospolita | rzeczpospolit\w*
+InPost | inpost\w*
+PKO BP | \bpko\b
+Pekao | pekao
+mBank | mbank\w*
+ING | \bing bank\w*|\bing\b
+Santander | santander
+Alior | alior\w*
+Millennium | millennium
+NBP | \bnbp\b|narodow\w* bank\w* polsk\w*
+KNF | \bknf\b|komisj\w* nadzoru finansow\w*
+ZUS | \bzus\b
+GPW | \bgpw\b|giełd\w* papierów wartościowych
+Orlen | orlen\w*
+PZU | \bpzu\b
+Revolut | revolut
+BLIK | \bblik\b
+Allegro | allegro
+OLX | \bolx\b
+App Store | app store|appstore
+Google Play | google play
+Jasna Góra | jasn\w* gór\w*

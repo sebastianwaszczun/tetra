@@ -10,11 +10,12 @@ from __future__ import annotations
 import os
 from typing import Any, Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from fakecollector.features import text as text_module
+from fakecollector.ingest import ingest_upload, run_osint
 
 app = FastAPI(
     title="FakeCollector API",
@@ -72,3 +73,50 @@ def analyze_text(req: TextAnalyzeRequest) -> TextAnalyzeResponse:
 
     features = text_module.analyze_text(text, origin=origin, title=title)
     return TextAnalyzeResponse(features=features.to_dict(with_vectors=req.with_vectors), page=page)
+
+
+# ----------------------------------------------------------------------------- preprocessing
+
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
+
+
+@app.post("/analyze", tags=["preprocessing"], summary="Przyjęcie materiału z frontu (tekst/link + pliki)")
+def analyze(
+    text: Optional[str] = Form(None, description="Tekst albo link (SMS, treść reklamy, adres strony)."),
+    files: list[UploadFile] = File(default=[], description="Zrzuty, wideo, HAR, HTML, JSON, ZIP…"),
+    fetch: bool = Form(True, description="Czy pobrać stronę z podanego linku (w kontenerze, Playwright)."),
+    text_features: bool = Form(True, description="Czy od razu policzyć cechy tekstu."),
+    osint: bool = Form(False, description="Czy od razu uruchomić moduł OSINT (bez zapytań DNS/WHOIS)."),
+) -> dict[str, Any]:
+    """Preprocessing: rozkłada materiał na składniki i mówi, który moduł co dostaje.
+
+    Zwraca też pola starego stuba (`text`, `files_count`, `files`), żeby front działał bez zmian.
+    Funkcja jest synchroniczna – FastAPI uruchamia ją w osobnym wątku (Playwright i OCR blokują).
+    """
+    text = (text or "").strip() or None
+    if not text and not files:
+        raise HTTPException(400, "Podaj tekst albo co najmniej jeden plik.")
+
+    received, payload, total = [], [], 0
+    for f in files:
+        data = f.file.read(MAX_UPLOAD_BYTES + 1)
+        total += len(data)
+        if total > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Pliki są za duże (limit MAX_UPLOAD_BYTES).")
+        received.append({"name": f.filename, "content_type": f.content_type, "size": len(data)})
+        payload.append((f.filename or "plik", data))
+
+    inc = ingest_upload(text=text, files=payload, fetch=fetch)
+    result: dict[str, Any] = {
+        "text": text is not None,
+        "files_count": len(received),
+        "files": received,
+        "incident": inc.to_dict(with_text=False),
+        "routes": inc.routes(),
+        "text_preview": inc.text[:1000],
+    }
+    if text_features and inc.text.strip():
+        result["text_features"] = text_module.extract(inc)
+    if osint:
+        result["osint"] = run_osint(inc, enrich=False)
+    return result

@@ -42,6 +42,15 @@ neo4j                       # sterownik Neo4j
 # --- API ---
 fastapi                     # endpointy REST, dokumentacja /docs
 uvicorn[standard]           # serwer ASGI
+python-multipart            # przesyłanie plików do API (POST /analyze)
+
+# --- Moduł OSINT (modules/osint) ---
+dnspython
+ipwhois
+python-whois
+tldextract
+mmh3
+cryptography
 
 # --- Bazy ---
 psycopg[binary]>=3.1

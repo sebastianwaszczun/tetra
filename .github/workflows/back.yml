@@ -65,4 +65,4 @@ jobs:
       - name: Deploy api
         run: |
           ssh -i ~/.ssh/id_deploy "${{ vars.VPS_USER }}@${{ vars.VPS_HOST }}" \
-            'set -e; cd ~/tetra; git pull --ff-only; docker compose up -d --build api; docker image prune -f'
+            'set -e; cd ~/tetra; git pull --ff-only; docker compose up -d --build api scheduler; docker image prune -f'

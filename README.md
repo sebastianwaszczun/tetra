@@ -1,85 +1,151 @@
-# FakeCollector – środowisko zespołu (HackNation · Kolekcjoner fejków)
+# FakeCollector – Kolekcjoner fejków (HackNation · NASK)
 
-Jeden `docker compose up` i każdy ma to samo środowisko:
+System, który przyjmuje podejrzaną reklamę w dowolnej postaci (link, zrzut ekranu, film, zapis strony,
+tekst), rozpoznaje, do której **kampanii** oszustów należy i **dlaczego**, oraz pokazuje, które kampanie
+prowadzi ten sam **operator** (wspólna infrastruktura).
+
+```
+wejście ─► preprocessing ─► moduły cech ─► rekord materiału ─► porównanie i grupowanie ─► graf + API + front
+(link, plik, folder)        tekst · OSINT · obraz · audio/wideo   (Postgres+pgvector)   kampanie · operatorzy
+```
+
+| Etap | Kod | Co robi |
+|---|---|---|
+| Preprocessing | `src/fakecollector/ingest/` | rozpoznaje wejście, otwiera link **w kontenerze** (Chromium), rozkłada materiał na części dla modułów (tekst, HAR/HTML, obrazy, nagrania), wykrywa duplikaty |
+| Moduł tekstu | `src/fakecollector/features/text.py` | osoby, marki, kwoty, perswazja, szkielet tekstu, odciski: sha256, MinHash, embeddingi |
+| Moduł OSINT | `modules/osint/` | domeny, przekierowania, piksele i konta reklamowe, kit, serwery, DNS/WHOIS/TLS → pivoty |
+| Moduł obrazu | `src/fakecollector/features/image/` | hashe percepcyjne, CLIP, twarze (ArcFace), logo, QR |
+| Moduł audio i wideo | `src/fakecollector/features/av.py` | transkrypcja (Whisper), odcisk głosu (ECAPA), odciski dźwięku i obrazu filmu, napisy z ekranu |
+| Rekord materiału | `src/fakecollector/record/` | wszystkie moduły → jeden rekord → Postgres (pgvector) → wyszukiwanie podobnych |
+| Grupowanie | `src/fakecollector/grouping/` | porównanie par modułami, kampanie i operatorzy, przesłanki |
+| Graf | `src/fakecollector/graph/` | graf powiązań dla frontu (`/graph`) i kopia w Neo4j |
+| API | `src/fakecollector/api/main.py` | FastAPI, dokumentacja: http://localhost:8000/docs |
+| Front | `front/` | React (Vite), http://localhost:5173 |
+
+## Usługi
 
 | Usługa | Co robi | Adres |
 |---|---|---|
-| **postgres** | PostgreSQL 16 + **pgvector** – reklamy, metadane, embeddingi | `localhost:5432` (fake / fake) |
-| **neo4j** | Graf powiązań reklam → kampanii, uzasadnienie na każdej krawędzi | http://localhost:7474 (neo4j / fakecollector) |
-| **app** | Python 3.11 + ML + JupyterLab | http://localhost:8888 (token: `fake`) |
+| **api** | FastAPI – wejście dla frontu | http://localhost:8000/docs |
+| **app** | Python 3.11 + modele ML + JupyterLab, tu uruchamiamy CLI | http://localhost:8888 (token `fake`) |
+| **postgres** | PostgreSQL 16 + pgvector – rekordy, wektory, kampanie | `localhost:5432` (fake / fake) |
+| **neo4j** | kopia grafu powiązań do przeglądania | http://localhost:7474 (neo4j / fakecollector) |
 
-W kontenerze `app`:
-- **Twarze:** InsightFace (ArcFace), facetorch (deepfake, emocje), MagFace (ręcznie, niżej)
-- **Obraz:** ImageHash (pHash), CLIP (open_clip), SigLIP (transformers)
-- **Tekst:** Tesseract OCR (PL + EN), sentence-transformers, datasketch (MinHash/LSH)
-- **Głos:** SpeechBrain (ECAPA – embeddingi mówcy), ffmpeg, librosa
-- **Infrastruktura:** requests/httpx, Playwright (Chromium – przekierowania JS, HAR), dnspython, python-whois, ipwhois (RDAP), mmh3 (hash favicony), tldextract, `whois`, `dig`
-- **Łączenie:** scikit-learn (HDBSCAN), networkx, sterownik Neo4j, psycopg + pgvector
+## Start od zera
 
-## Start (pierwszy raz)
-
-Wymagany Docker Desktop (Windows/macOS) lub Docker Engine (Linux). Najlepiej 16 GB RAM i ~20 GB wolnego miejsca.
+Wymagany Docker Desktop (Windows/macOS) albo Docker Engine (Linux), ok. 16 GB RAM i 25 GB miejsca.
 
 ```bash
-cp .env.example .env                  # Windows PowerShell: copy .env.example .env
-docker compose up -d --build          # pierwszy build trwa 10–20 min
-docker compose exec app python scripts/check_env.py      # wszystko na zielono?
-docker compose exec app python scripts/download_models.py   # modele do wspólnego cache
+cp .env.example .env                      # Windows: copy .env.example .env
+docker login                              # zalecane: Docker Hub bez logowania ma limit pobrań (błąd 429)
+docker compose build app                  # pierwszy build 15–30 min
+docker compose up -d
+docker compose exec app python scripts/pobierz_modele_obrazu.py --modele siglip2,clip,buffalo_l,yunet_sface,magface,facetorch
+docker compose exec app python scripts/smoke_test.py      # 23 testy, ok. 5 min
 ```
 
-Potem otwórz http://localhost:8888 (token `fake`).
+Whisper i SpeechBrain pobierają się same przy pierwszym użyciu (ok. 1 GB) do wspólnego wolumenu `models`.
+
+### Dane z paczki
+
+Dane organizatora **nie trafiają do repo** (regulamin). Rozpakuj je do `data/` tak, żeby powstało
+`data/BACKUP/p1…p15` i `data/DANE/1…61`. Używaj **7-Zip** (archiwum jest szyfrowane AES), a folder
+projektu dodaj do wyjątków Windows Defendera – inaczej Defender usuwa zapisane strony HTML.
+
+### Wypełnienie bazy (ok. 15 minut)
+
+```bash
+docker compose exec app python -m fakecollector.record add data/BACKUP data/DANE --no-asr
+docker compose exec app python -m fakecollector.grouping rebuild
+docker compose exec app python -m fakecollector.graph sync
+```
+
+`record add` analizuje i zapisuje materiały, `rebuild` składa kampanie, `graph sync` odświeża Neo4j.
+`--no-asr` pomija transkrypcję (szybciej); odcisk głosu i dźwięku liczy się nadal.
+
+Czysta baza od nowa (np. po ponownym `record add` tych samych folderów, które tworzy duplikaty):
+```bash
+docker compose exec postgres psql -U fake -d fakecollector -c "TRUNCATE materials, campaigns RESTART IDENTITY CASCADE"
+docker compose exec app rm -f data/store/index.json
+```
+
+### Front
+```bash
+cd front
+npm install
+npm run dev                               # http://localhost:5173 (adres API: VITE_API_URL, domyślnie :8000)
+```
+
+## API (najważniejsze)
+
+| Adres | Zwraca |
+|---|---|
+| `POST /analyze` (multipart: `text`, `files`) | analiza materiału, zapis, `assignment` (kampania, status, wynik, przesłanki), `candidates` |
+| `GET /stats` | liczby: materiały, kampanie, operatorzy, do weryfikacji |
+| `GET /campaigns`, `GET /campaigns/{id}` | kampanie; szczegóły z materiałami, powiązaniami i kampaniami tego samego operatora |
+| `GET /materials`, `GET /materials/{id}`, `/materials/{id}/candidates` | rekordy materiałów (bez wektorów) i podobne materiały |
+| `GET /graph` (`?campaign_id=`, `?operator=`, `?material_id=`) | graf `{nodes, edges, stats, legend}` dla Cytoscape / vis-network / react-force-graph |
+| `GET /compare?a=&b=` | porównanie dwóch materiałów wszystkimi modułami |
+| `POST /campaigns/rebuild`, `POST /graph/sync` | przeliczenie kampanii, kopia grafu w Neo4j |
+| `POST /text/analyze`, `/image/analyze`, `/image/compare`, `/av/compare` | pojedyncze moduły (do testów) |
+
+`POST /analyze` trwa od kilku sekund do 1–2 minut (OSINT z DNS/WHOIS, modele obrazu, transkrypcja filmu) –
+front musi czekać na odpowiedź. Przełączniki: `fetch`, `osint`, `av`, `asr`, `image`, `save`, `group`.
+
+## Jak powstaje kampania
+
+1. **Kandydaci** – rekord zawiera klucze (hash tekstu, pasma MinHash, domena, piksel, hash obrazu, QR,
+   odcisk dźwięku) i wektory (tekst, obraz, twarze, głos). Baza zwraca materiały, z którymi coś się zgadza.
+2. **Porównanie** – każdy moduł porównuje swoje cechy (`compare`). Wynik poniżej progu szumu modułu nic nie
+   wnosi; wkłady łączymy wzorem **1 − Π(1 − wkład)**: jeden pewny dowód wystarcza, brak modułu nie obniża wyniku.
+3. **Dwa poziomy**:
+   * **kampania** – ta sama treść: szablon tekstu, te same kreacje, twarz lektora, to samo nagranie,
+     ta sama domena (przy tym samym zestawie stron) lub ta sama reklama Meta,
+   * **operator** – wspólna infrastruktura: Pixel Meta, GA/GTM, katalog kitu, serwer aktora, certyfikat,
+     wspólne grafiki stron. Łączy kampanie, ale ich nie scala.
+4. **Decyzja**: ≥ 0.75 *przypisany*, 0.5–0.75 *do weryfikacji* (decyduje analityk), poniżej *nowy wzorzec*.
+5. **Szum**: ślady skopiowane z podszywanego serwisu (favicon, CSS/JS, beacony Gazeta.pl/TVN24) obecne w > 30%
+   bazy nie łączą materiałów; kopie skryptów Facebooka/Google z zapisanych stron nie są śladem kitu.
+
+Wynik na paczce: kampania Brzoski (p1, p2, p7, p15, DANE/1, DANE/2), Stanowski/Sekielski (p3, p4),
+Nawrocki (p8, p11) oraz osobne kampanie Olejnik, „37 minut po emisji” i Glowpixel – wszystkie pod jednym
+operatorem (ten sam Pixel Meta i serwer aktora). Drugi operator: suplementy Kardivix, Metabo RX, Uromexil
+i biała strona „Cactus Recipe”.
+
+## Narzędzia wiersza poleceń (w kontenerze `app`)
+
+```bash
+python -m fakecollector.ingest data/DANE/47 --no-fetch               # preprocessing jednego przypadku
+python -m fakecollector.features.text data/BACKUP/p3 data/BACKUP/p4 --compare
+python -m fakecollector.features.av data/DANE/5 data/DANE/14 --compare
+python -m fakecollector.record list | show <id> | candidates <id>
+python -m fakecollector.grouping campaigns | show <nr> | compare <id_a> <id_b> | assign <id>
+python -m fakecollector.graph stats | export data/graf.json | sync
+python scripts/smoke_test.py [--fast] [--enrich]                     # test całego potoku
+```
+
+Neo4j Browser (http://localhost:7474), przykład: `MATCH (n:FC) RETURN n LIMIT 300` albo
+`MATCH (o:Operator)<-[:OPERATOR]-(k:Kampania) RETURN o, k`.
 
 ## Codzienna praca
 
 ```bash
-docker compose up -d                  # start
-docker compose down                   # stop (dane zostają)
-docker compose exec app bash          # terminal w kontenerze
-docker compose logs -f app            # logi
+docker compose up -d          # start
+docker compose down           # stop (dane zostają)
+docker compose logs -f api    # logi API
 ```
 
-- Kod piszemy w `src/` (pakiet `fakecollector`, jest na `PYTHONPATH`). Folder jest zamontowany w kontenerze, więc zmiany widać od razu.
-- Dane wrzucamy do `data/` (np. rozpakowany `___BACKUP.zip`). Nie trafiają do gita.
-- Połączenia z bazami:
-
-```python
-from fakecollector.db import pg, neo, add_link
-
-with pg() as c:
-    print(c.execute("SELECT count(*) FROM ads").fetchone())
-
-add_link(1, 2, "face", 0.83, 0.7,
-         "Ta sama twarz (ArcFace cos=0.83, MagFace q=27) – wizerunek Rafała Brzoski")
-```
-
-## Schemat bazy (`db/init.sql`)
-
-`ads` · `faces` (ArcFace 512 + jakość MagFace + deepfake) · `ad_embeddings` (CLIP 512, SigLIP 768, tekst 384, głos 192) · `infra` (przekierowania, IP, NS, rejestrator, certyfikaty, favicon, trackery, Pixel ID) · `links` (krawędź + **uzasadnienie**) · `campaigns` · `reference_people`. Indeksy HNSW (cosine) na wszystkich wektorach.
-
-Skrypt wykonuje się tylko przy **pustej** bazie. Reset bazy (usuwa dane!):
-```bash
-docker compose down -v && docker compose up -d
-```
-
-## MagFace
-
-Nie ma pakietu pip:
-```bash
-docker compose exec app bash
-cd /workspace/src && git clone https://github.com/IrvingMeng/MagFace.git
-mkdir -p /models/magface   # wrzuć tu wagi magface_epoch_00025.pth (link w README MagFace)
-```
-Szybki zamiennik na start: norma surowego embeddingu z InsightFace (`face.embedding_norm`) też koreluje z jakością twarzy.
-
-## GPU (opcjonalnie, NVIDIA + Linux/WSL2)
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
-```
+- Kod jest zamontowany w kontenerach (`src/`, `modules/`, `config/`), API przeładowuje się samo – po zmianie
+  kodu nie trzeba builda. Build tylko po zmianie `requirements.txt`, `constraints.txt` lub `Dockerfile`.
+- Biblioteka doinstalowana ręcznie (`docker compose exec app pip install …`) znika przy odtworzeniu kontenera.
+- Po merge'u cudzego kodu: `python scripts/smoke_test.py`.
 
 ## Problemy
 
-- **Port zajęty** → zmień `POSTGRES_PORT` / `JUPYTER_PORT` / `NEO4J_*_PORT` w `.env`.
-- **Build pada na insightface** → zwiększ RAM dla Dockera (Docker Desktop → Settings → Resources).
-- **Mac M1/M2/M3** → działa (obrazy są dla arm64), tylko na CPU.
-- ⚠️ Linków ze scamów nie otwieraj w swojej przeglądarce. Analizuj je w kontenerze (Playwright headless).
+- **`429 Too Many Requests` przy buildzie** → `docker login` (limit Docker Hub dla niezalogowanych).
+- **`Form data requires "python-multipart"`** albo brak `open_clip_torch` 2.32 → obraz sprzed zmian w
+  `requirements.txt`: `docker compose build app` (albo doraźnie `pip install` w kontenerach `app` i `api`).
+- **Moduł obrazu bez wektorów CLIP** → nie pobrano modeli: `python scripts/pobierz_modele_obrazu.py …`.
+- **Materiał z 0 słów tekstu** → brak pliku HTML (Windows Defender) – rozpakuj paczkę ponownie przez 7-Zip.
+- **Port zajęty** → zmień porty w `.env`.
+- ⚠️ Linków ze scamów nie otwieraj w swojej przeglądarce – system otwiera je tylko w kontenerze.

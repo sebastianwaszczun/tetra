@@ -308,11 +308,140 @@ def _():
     return f"tekst z: {inc.text_origin[0]}, {len(inc.text.split())} słów"
 
 
+# ============================================================================ obraz i rekord materiału
+print("\nModuł obrazu i rekord materiału")
+
+
+def record_of(name: str):
+    key = f"rec:{name}"
+    if key not in CACHE:
+        from fakecollector.record import process_incident
+        inc = ingest_case(name, ocr=False)
+        CACHE[key] = process_incident(inc, save=False, asr=False, osint=True, enrich=False, image=True)
+    return CACHE[key]
+
+
+@check("obraz", "BACKUP/p1: obrazy materiału przez moduł obrazu (hashe, CLIP, twarze)")
+def _():
+    try:
+        import fakecollector.features.image  # noqa: F401
+    except ImportError as e:
+        raise Skip(f"moduł obrazu niedostępny ({e})")
+    out = record_of("BACKUP/p1")
+    mod = out["record"]["modules"]["image"]
+    assert mod["status"] == "ok", mod
+    im = out["_results"].image
+    assert im["images_analyzed"] >= 1, im
+    with_vec = sum(1 for it in im["items"] if it["cechy"].get("wektor"))
+    if not ARGS.fast:
+        assert with_vec >= 1, "brak wektorów CLIP – pobierz modele: python scripts/pobierz_modele_obrazu.py " \
+                              "--modele siglip2,clip,buffalo_l,yunet_sface,magface,facetorch"
+    return f"{im['images_analyzed']} obrazów, wektorów {with_vec}, osoby na obrazach {im['persons_visual']}"
+
+
+@check("rekord", "BACKUP/p1: rekord ma podsumowanie, klucze i wektory")
+def _():
+    rec = record_of("BACKUP/p1")["_record"]
+    kinds = {k for k, _, _ in rec.keys}
+    assert {"text_lsh", "skel_lsh", "domain", "text_sha256"} <= kinds, kinds
+    assert rec.summary["domain"] == "dorquesio.click", rec.summary["domain"]
+    if rec.summary["modules"]["osint"]["status"] == "ok":
+        assert any(k.startswith("osint:") for k in kinds), "brak kluczy OSINT"
+    if not ARGS.fast:
+        assert any(v[0] == "text" for v in rec.vectors), "brak wektora tekstu"
+    return f"{len(rec.keys)} kluczy, {len(rec.vectors)} wektorów, moduły " + \
+        ", ".join(f"{m}:{v['status']}" for m, v in rec.summary["modules"].items())
+
+
+@check("rekord", "zapis w bazie i kandydaci: p1 znajduje p15 (ta sama kampania), nie p9")
+def _():
+    if not os.environ.get("DATABASE_URL"):
+        raise Skip("brak DATABASE_URL (uruchom w kontenerze app)")
+    from fakecollector.record import delete_material, find_candidates, load_record, save_record
+    ids = []
+    try:
+        for name in ("BACKUP/p1", "BACKUP/p15", "BACKUP/p9"):
+            rec = record_of(name)["_record"]
+            save_record(rec)
+            ids.append(rec.id)
+        back = load_record(ids[0])
+        assert back and set(back.features) == set(record_of("BACKUP/p1")["_record"].features), "odczyt rekordu"
+        cands = {c["id"]: c for c in find_candidates(ids[0])}
+        assert ids[1] in cands, f"p15 nie jest kandydatem: {list(cands)}"
+        sig15 = [s["signal"] for s in cands[ids[1]]["signals"]]
+        assert "text_lsh" in sig15 or "text_sha256" in sig15, sig15
+        rank9 = cands.get(ids[2], {}).get("rank", 0)
+        assert rank9 < cands[ids[1]]["rank"], f"p9 ({rank9}) wyżej niż p15"
+        return f"p15: ranga {cands[ids[1]]['rank']} ({', '.join(sig15[:4])}); p9: {rank9}"
+    finally:
+        for i in ids:
+            try:
+                delete_material(i)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+@check("grupowanie", "kampanie: Brzoska (p1+p15+DANE/1) i p3+p4 osobno, ale ten sam operator; p9 osobno")
+def _():
+    if not os.environ.get("DATABASE_URL"):
+        raise Skip("brak DATABASE_URL (uruchom w kontenerze app)")
+    from fakecollector.grouping import compare_materials, rebuild
+    from fakecollector.record import delete_material, save_record
+    names = ["BACKUP/p1", "BACKUP/p15", "DANE/1", "BACKUP/p3", "BACKUP/p4", "BACKUP/p9"]
+    ids = {}
+    try:
+        for name in names:
+            rec = record_of(name)["_record"]
+            save_record(rec)
+            ids[name] = rec.id
+        res = rebuild(ids=list(ids.values()), write=False)
+        n = {v: k for k, v in ids.items()}
+        show = [[n[m] for m in g] for g in res["clusters"]]
+        group = {m: tuple(sorted(g)) for g in res["clusters"] for m in g}
+        p1, p3 = ids["BACKUP/p1"], ids["BACKUP/p3"]
+        assert group.get(p1) and group[p1] == group.get(ids["BACKUP/p15"]) == group.get(ids["DANE/1"]), \
+            f"Brzoska rozbity: {show}"
+        assert group.get(p3) and group[p3] == group.get(ids["BACKUP/p4"]), f"p3/p4 rozbite: {show}"
+        assert group[p1] != group[p3], f"Brzoska i Stanowski w jednej kampanii: {show}"
+        assert ids["BACKUP/p9"] not in group, "p9 dołączony do kampanii"
+        same_op = any(p1 in g and p3 in g for g in res["operator_clusters"])
+        r = compare_materials(p1, p3)
+        assert same_op, f"brak wspólnego operatora p1~p3 (operator {r.operator_score}, {r.operator_reasons[:2]})"
+        return f"kampanie: {show}; p1~p3: kampania {r.score}, operator {r.operator_score} ({r.operator_reasons[:1]})"
+    finally:
+        for i in ids.values():
+            try:
+                delete_material(i)
+            except Exception:  # noqa: BLE001
+                pass
+
+
+@check("graf", "graf z bazy (kampanie, materiały, ślady) i kopia w Neo4j")
+def _():
+    if not os.environ.get("DATABASE_URL"):
+        raise Skip("brak DATABASE_URL (uruchom w kontenerze app)")
+    from fakecollector.graph import build_graph
+    g = build_graph()
+    if not g["nodes"]:
+        raise Skip("pusta baza – najpierw: python -m fakecollector.record add data/BACKUP data/DANE")
+    types = g["stats"]["by_node_type"]
+    assert "material" in types, types
+    ids = {n["id"] for n in g["nodes"]}
+    assert all(e["source"] in ids and e["target"] in ids for e in g["edges"]), "krawędź do nieistniejącego węzła"
+    detail = f"węzły {types}, krawędzie {g['stats']['by_edge_type']}"
+    if os.environ.get("NEO4J_URI"):
+        from fakecollector.graph.neo4j_sync import sync
+        r = sync(g)
+        assert r["nodes"] == len(g["nodes"]), r
+        detail += f"; Neo4j: {r['nodes']} węzłów, {r['edges']} krawędzi"
+    return detail
+
+
 # ============================================================================ API
 print("\nAPI")
 
 
-@check("api", "POST /analyze z plikiem strony (p3)")
+@check("api", "POST /analyze z plikiem strony (p3), bez zapisu do bazy")
 def _():
     try:
         from fastapi.testclient import TestClient
@@ -322,7 +451,8 @@ def _():
     client = TestClient(app)
     html = next(p for p in need(BACKUP / "p3").iterdir() if p.suffix == ".html")
     resp = client.post("/analyze", files=[("files", (html.name, html.read_bytes(), "text/html"))],
-                       data={"fetch": "false", "osint": "true" if ARGS.enrich else "false", "av": "false"})
+                       data={"fetch": "false", "osint": "true" if ARGS.enrich else "false", "av": "false",
+                             "image": "false", "save": "false"})
     assert resp.status_code == 200, f"{resp.status_code}: {resp.text[:300]}"
     d = resp.json()
     assert d["routes"]["text"] >= 1 and d["text_features"]["persons"], d.get("routes")

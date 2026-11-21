@@ -7,6 +7,7 @@ Dokumentacja interaktywna: http://localhost:8000/docs
 """
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Literal, Optional
 
@@ -86,7 +87,8 @@ def analyze(
     files: list[UploadFile] = File(default=[], description="Zrzuty, wideo, HAR, HTML, JSON, ZIP…"),
     fetch: bool = Form(True, description="Czy pobrać stronę z podanego linku (w kontenerze, Playwright)."),
     text_features: bool = Form(True, description="Czy od razu policzyć cechy tekstu."),
-    osint: bool = Form(False, description="Czy od razu uruchomić moduł OSINT (bez zapytań DNS/WHOIS)."),
+    osint: bool = Form(True, description="Moduł OSINT z pełnym wzbogacaniem (DNS, RDAP/WHOIS, ASN, TLS, crt.sh). "
+                                         "Wydłuża odpowiedź o kilka–kilkanaście sekund."),
 ) -> dict[str, Any]:
     """Preprocessing: rozkłada materiał na składniki i mówi, który moduł co dostaje.
 
@@ -118,5 +120,23 @@ def analyze(
     if text_features and inc.text.strip():
         result["text_features"] = text_module.extract(inc)
     if osint:
-        result["osint"] = run_osint(inc, enrich=False)
+        try:
+            result["osint"] = run_osint(inc, enrich=True)
+        except Exception as exc:  # awaria OSINT nie może zabrać reszty wyniku
+            result["osint"] = None
+            result["osint_error"] = f"{exc.__class__.__name__}: {exc}"
+    _dump_response(result, inc.id)   # TYMCZASOWE: podgląd odpowiedzi w pliku na pulpicie
     return result
+
+
+def _dump_response(result: dict[str, Any], incident_id: str) -> None:
+    """TYMCZASOWE: zapisuje pełną odpowiedź /analyze do ~/Desktop/analyze_<czas>_<id>.txt."""
+    from datetime import datetime
+    from pathlib import Path
+    try:
+        out = Path(os.environ.get("ANALYZE_DUMP_DIR", Path.home() / "Desktop"))
+        out.mkdir(parents=True, exist_ok=True)
+        name = f"analyze_{datetime.now():%Y%m%d_%H%M%S}_{incident_id}.txt"
+        (out / name).write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except OSError:
+        pass   # zapis podglądu nie może zepsuć odpowiedzi

@@ -7,6 +7,7 @@ Dokumentacja interaktywna: http://localhost:8000/docs
 """
 from __future__ import annotations
 
+import json
 import os
 from typing import Any, Literal, Optional
 
@@ -27,7 +28,7 @@ app = FastAPI(
 # Front w React (Vite) działa na innym porcie, więc przeglądarka potrzebuje zgody CORS.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(","),
+    allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -114,7 +115,8 @@ def analyze(
     files: list[UploadFile] = File(default=[], description="Zrzuty, wideo, HAR, HTML, JSON, ZIP…"),
     fetch: bool = Form(True, description="Czy pobrać stronę z podanego linku (w kontenerze, Playwright)."),
     text_features: bool = Form(True, description="Czy od razu policzyć cechy tekstu."),
-    osint: bool = Form(False, description="Czy od razu uruchomić moduł OSINT (bez zapytań DNS/WHOIS)."),
+    osint: bool = Form(True, description="Moduł OSINT z pełnym wzbogacaniem (DNS, RDAP/WHOIS, ASN, TLS, crt.sh). "
+                                         "Wydłuża odpowiedź o kilka–kilkanaście sekund."),
     av: bool = Form(True, description="Czy analizować wideo i audio (głos, dźwięk, obraz, napisy)."),
     asr: bool = Form(True, description="Czy robić transkrypcję mowy (najwolniejsza część, ~1 min na film)."),
 ) -> dict[str, Any]:
@@ -146,15 +148,37 @@ def analyze(
         "text_preview": inc.text[:1000],
     }
     if av and inc.for_module("av"):
-        av_feats = av_module.extract(inc, asr=asr)
-        av_module.attach_to_incident(inc, av_feats)   # transkrypcja -> tekst materiału
-        result["av_features"] = av_module.to_dict(av_feats, with_vectors=False)
-        result["incident"] = inc.to_dict(with_text=False)
-        result["text_preview"] = inc.text[:1000]
+        try:
+            av_feats = av_module.extract(inc, asr=asr)
+            av_module.attach_to_incident(inc, av_feats)   # transkrypcja -> tekst materiału
+            result["av_features"] = av_module.to_dict(av_feats, with_vectors=False)
+            result["incident"] = inc.to_dict(with_text=False)
+            result["text_preview"] = inc.text[:1000]
+        except Exception as exc:  # awaria modułu AV nie może zabrać reszty wyniku
+            result["av_features"] = None
+            result["av_error"] = f"{exc.__class__.__name__}: {exc}"
     if text_features and inc.text.strip():
         origin = inc.text_origin[0] if inc.text_origin else "html"
         feats = text_module.analyze_text(inc.text, origin=origin, title=inc.title)
         result["text_features"] = feats.to_dict(with_vectors=False)   # wektory idą do bazy, nie do frontu
     if osint:
-        result["osint"] = run_osint(inc, enrich=False)
+        try:
+            result["osint"] = run_osint(inc, enrich=True)
+        except Exception as exc:  # awaria OSINT nie może zabrać reszty wyniku
+            result["osint"] = None
+            result["osint_error"] = f"{exc.__class__.__name__}: {exc}"
+    _dump_response(result, inc.id)   # TYMCZASOWE: podgląd odpowiedzi w pliku na pulpicie
     return result
+
+
+def _dump_response(result: dict[str, Any], incident_id: str) -> None:
+    """TYMCZASOWE: zapisuje pełną odpowiedź /analyze do ~/Desktop/analyze_<czas>_<id>.txt."""
+    from datetime import datetime
+    from pathlib import Path
+    try:
+        out = Path(os.environ.get("ANALYZE_DUMP_DIR", Path.home() / "Desktop"))
+        out.mkdir(parents=True, exist_ok=True)
+        name = f"analyze_{datetime.now():%Y%m%d_%H%M%S}_{incident_id}.txt"
+        (out / name).write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    except OSError:
+        pass   # zapis podglądu nie może zepsuć odpowiedzi

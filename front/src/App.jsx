@@ -212,6 +212,7 @@ export default function App() {
   const send = (text, list) => {
     const body = new FormData()
     if (text) body.append('text', text)
+    body.append('osint', 'true')
     list.forEach((f) => body.append('files', f, f.name))
     request.current?.abort()
     const ctrl = new AbortController()

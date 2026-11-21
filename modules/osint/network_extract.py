@@ -31,6 +31,11 @@ _STATIC_TYPES = {"script", "stylesheet", "image", "font", "media", "manifest"}
 _MEDIA_EXT = re.compile(r"\.(ts|m3u8|mp4|m4s|webm|mp3|aac|m4a|mpd)$", re.I)
 
 
+# Znane skrypty śledzące z popularnych serwisów – rozpoznawane po nazwie, gdy zapisana strona nie ma HAR-a
+# (przeglądarka przy zapisie gubi oryginalny adres, np. connect.facebook.net/…/fbevents.js).
+_THIRD_PARTY_JS = re.compile(r"^(fbevents|gtm|gtag|analytics|ga|clarity|uwt|bat|hotjar-\d+)\.js$")
+
+
 def _qname(n: str) -> str:
     """event8 / event12 -> event{n}: numerowane parametry beaconów nie mnożą sygnatur."""
     return re.sub(r"\d+$", "{n}", n)
@@ -194,6 +199,9 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
     scripts, styles, images = [], [], []
     kit_dirs, families, layout = Counter(), Counter(), Counter()
     favicon = None
+    # treść plików z popularnych serwisów (Facebook, Google…) – ich kopie z zapisanej strony to nie kit
+    commodity_bodies = {r.body_sha256 for r in res
+                        if r.body_sha256 and role(host_of(r.url)) == "commodity"}
     for r in res + [x for x in cap.resources if x.url.startswith("saved:")]:
         h = host_of(r.url) if r.url.startswith("http") else ""
         rl = role(h) if h else "saved_page"
@@ -215,7 +223,12 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
             if "{" in dir_tpl or dir_tpl.count("/") >= 2:
                 layout[dir_tpl] += 1
         if rtype in ("script", "stylesheet"):
-            is_vendor = rl == "commodity" or bool(_LIB.search(fname)) or ".min." in fname and rl != "landing"
+            is_vendor = (rl == "commodity" or bool(_LIB.search(fname))
+                         or ".min." in fname and rl != "landing"
+                         # kopia z zapisanej strony (adres zgubiony): ta sama treść co plik z FB/Google
+                         # albo nazwa znanego skryptu śledzącego – to nie własny skrypt kitu
+                         or rl == "saved_page" and (r.body_sha256 in commodity_bodies
+                                                    or bool(_THIRD_PARTY_JS.match(fname))))
             norm_hash = None
             if r.body:
                 norm_hash = sha256(normalize_code(r.body.decode("utf-8", "replace")).encode())[:32]

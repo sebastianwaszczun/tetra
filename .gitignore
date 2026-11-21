@@ -3,3 +3,9 @@ data/*
 !data/.gitkeep
 __pycache__/
 .ipynb_checkpoints/
+
+# archiwa z danymi (np. ___BACKUP.zip) nie trafiają do repo
+*.zip
+
+# materiały od organizatorów (treść zadania NASK) – tylko lokalnie
+docs/tresc_zadania_nask.pdf

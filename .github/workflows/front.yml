@@ -36,8 +36,7 @@ jobs:
       - name: Caddyfile
         run: |
           docker run --rm -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" \
-            -e DOMAIN=example.com -e BASIC_AUTH_USER=ci \
-            -e 'BASIC_AUTH_HASH=$2a$14$Zkx19XLiW6VYouLHR5NmfOFU0z2GTNmpkT/5qqR7hx4IjWJPDhjvG' \
+            -e DOMAIN=example.com \
             caddy:2.8.4 caddy validate --config /etc/caddy/Caddyfile
 
   deploy:

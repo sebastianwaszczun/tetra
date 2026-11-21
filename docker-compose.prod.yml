@@ -54,6 +54,9 @@ services:
       CORS_ORIGINS: https://${DOMAIN:?ustaw DOMAIN w .env}
       PYTHONPATH: /workspace/src:/workspace/modules
       STORE_DIR: /workspace/data/store
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
+      ADLIB_ANALYZE_URL: http://localhost:8000/analyze
     volumes:
       - ./src:/workspace/src
       - ./modules:/workspace/modules
@@ -62,6 +65,27 @@ services:
       - ./data:/workspace/data
       - models:/models
     shm_size: "2gb"
+
+  scheduler:
+    image: fakecollector-app:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    command: python -m fakecollector.worker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fakecollector}
+      PYTHONPATH: /workspace/src:/workspace/modules
+      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+      ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
+      ADLIB_ANALYZE_URL: http://api:8000/analyze
+    volumes:
+      - ./src:/workspace/src
+      - ./modules:/workspace/modules
+      - ./data:/workspace/data
+      - ./config:/workspace/config
 
   web:
     build:

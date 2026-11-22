@@ -193,12 +193,6 @@ class Magazyn:
              liczby.get("wybranych", 0), liczby.get("przeanalizowanych", 0), liczby.get("wywolan_api", 0),
              Jsonb(bledy), skan_id))
 
-    def trwajacy_skan(self) -> bool:
-        """Skan w toku. Wpis starszy niż 2 h uznajemy za przerwany (np. restart kontenera)."""
-        w = self.conn.execute("SELECT count(*) AS n FROM adlib_skany WHERE status = 'trwa' "
-                              "AND start > now() - interval '2 hours'").fetchone()
-        return w["n"] > 0
-
     def ostatni_udany_skan(self) -> datetime | None:
         w = self.conn.execute("SELECT max(start) AS t FROM adlib_skany WHERE status = 'zakonczony'").fetchone()
         return w["t"]

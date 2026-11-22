@@ -14,7 +14,7 @@ const RED = '#C62828'
 const OCHRE = '#B7791F'
 
 // wygląd węzłów: rozmiar (promień w jednostkach grafu), kształt i wypełnienie „ołówkiem” Rough.js
-export const NODE_STYLE = {
+const NODE_STYLE = {
   material: { r: 15, name: 'materiał (miniatura zrzutu)', fill: PAPER_HI, fillStyle: 'solid' },
   campaign: { r: 15, name: 'kampania (teczka)', fill: INK, fillStyle: 'hachure', gap: 2.6 },
   operator: { r: 15, name: 'operator', fill: RED, fillStyle: 'solid' },
@@ -25,7 +25,7 @@ export const NODE_STYLE = {
   infra: { r: 9, name: 'infrastruktura', fill: '#3B5B9A', fillStyle: 'zigzag', gap: 2.8 },
 }
 
-export const EDGE_STYLE = {
+const EDGE_STYLE = {
   ta_sama_kampania: { color: INK, width: 2.6, dash: null, name: 'ta sama kampania (≥ 0,75)' },
   do_weryfikacji: { color: OCHRE, width: 2, dash: [5, 4], name: 'do weryfikacji (0,5–0,75)' },
   ten_sam_operator: { color: RED, width: 1.8, dash: [2, 3], name: 'ten sam operator' },
@@ -94,7 +94,7 @@ function ring(r, color, dash, seed) {
 
 // ---------------------------------------------------------------- miniatury zrzutów materiałów
 
-export function useThumbs(nodes, max = 40) {
+function useThumbs(nodes, max = 40) {
   const [tick, setTick] = useState(0)
   const cache = useRef(new Map())
   const ids = nodes.filter((n) => n.type === 'material').slice(0, max)

@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { imageUrl, postJSON } from './api.js'
 import { href } from './route.js'
 import {
-  ASSIGNMENT, Badge, Box, ErrorNote, Loading, MODULES, Note, PERSUASION, Score, ago, materialy, useFetch,
+  Badge, Box, ErrorNote, Loading, MODULES, Note, PERSUASION, Score, ago, materialy, useFetch,
 } from './ui.jsx'
 
 const LINK_TYPES = new Set(['ta_sama_kampania', 'do_weryfikacji', 'ten_sam_operator'])
@@ -269,4 +269,3 @@ export function Images({ materialId }) {
   )
 }
 
-export { ASSIGNMENT }

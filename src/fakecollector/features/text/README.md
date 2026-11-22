@@ -2,14 +2,14 @@
 
 Moduł wyciąga z tekstu materiału cechy narracji i porównuje dwa materiały po tekście. Rozpoznaje ten sam tekst na różnych domenach oraz ten sam szablon artykułu z inną osobą, marką albo kwotą. Każde porównanie zwraca przesłanki w zdaniach dla człowieka.
 
-Plik: `src/fakecollector/features/text.py`
+Kod: `src/fakecollector/features/text/` (`__init__.py`, CLI w `__main__.py`)
 Miejsce w systemie: moduł cech między preprocessingiem a porównaniem i grupowaniem (zob. schemat „Architektura FakeCollector”).
 
 ## Pliki
 
 | Plik | Zawartość |
 |---|---|
-| `text.py` | cały moduł: ekstrakcja tekstu z HTML, cechy, porównanie, CLI |
+| `__init__.py`, `__main__.py` | cały moduł: ekstrakcja tekstu z HTML, cechy, porównanie; CLI |
 | `lexicons/osoby.txt` | osoby, których wizerunek kradną reklamy, z wyrażeniem regularnym obejmującym odmianę nazwiska |
 | `lexicons/marki.txt` | podszywane marki: media, banki, instytucje, sklepy |
 | `lexicons/stopwords_pl.txt` | stop-słowa polskie i angielskie oraz słowa z widgetów komentarzy („Lubię to · Odpowiedz”) |

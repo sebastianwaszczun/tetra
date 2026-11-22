@@ -21,7 +21,7 @@ from fakecollector.features import text as text_module
 from fakecollector import graph as graph_module
 from fakecollector import grouping as grouping_module
 from fakecollector import record as record_module
-from fakecollector.ingest import ingest_upload, run_osint
+from fakecollector.ingest import ingest_upload
 
 app = FastAPI(
     title="FakeCollector API",

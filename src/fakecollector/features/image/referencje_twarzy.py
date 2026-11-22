@@ -1,5 +1,4 @@
 """Lokalna baza referencyjna, dopasowanie i sprawdzian „wyjmij jedno”."""
-import json
 import sqlite3
 from collections import Counter
 from collections.abc import Mapping, Sequence

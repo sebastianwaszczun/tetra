@@ -254,7 +254,6 @@ def compare_audio_fp(ha: list[int], ta: list[int], hb: list[int], tb: list[int])
     idx_b = np.concatenate([np.arange(l, h) for l, h in zip(lo[counts > 0], hi[counts > 0])])
     offsets = tb_s[idx_b] - ta_[idx_a]
     vals, cnt = np.unique(offsets, return_counts=True)
-    best = int(cnt.max())
     # dopuszczamy ±1 ramkę rozjazdu
     k = int(np.argmax(cnt))
     near = int(cnt[np.abs(vals - vals[k]) <= 1].sum())

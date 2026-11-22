@@ -20,7 +20,6 @@ import logging
 import math
 import os
 import re
-import sys
 import unicodedata
 from collections import Counter
 from dataclasses import asdict, dataclass, field
@@ -34,7 +33,7 @@ log = logging.getLogger(__name__)
 
 LEXICON_DIR = Path(__file__).with_name("lexicons")
 
-# Model zgodny z kolumną ad_embeddings.text_emb vector(384) i pobierany przez download_models.py.
+# Wektor 384-d zapisywany w material_vectors (rodzaj text / text_skeleton); model pobiera się sam przy pierwszym użyciu.
 EMBED_MODEL = os.environ.get(
     "TEXT_EMB_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )

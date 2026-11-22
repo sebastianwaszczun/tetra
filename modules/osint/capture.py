@@ -37,14 +37,12 @@ class Resource:
     mime: str = ""
     resource_type: str = ""          # document / script / stylesheet / image / xhr / fetch / media / ...
     headers: list[tuple[str, str]] = field(default_factory=list)   # nazwy małymi literami
-    req_headers: list[tuple[str, str]] = field(default_factory=list)
     body: bytes | None = None
     body_sha256: str | None = None
     size: int = 0
     ip: str | None = None
     redirect_url: str | None = None
     started: str | None = None
-    initiator: str | None = None
     source: str = ""                 # skąd: har:<plik>, mhtml:<plik>, saved_files:<plik>, live
     cookies: list[str] = field(default_factory=list)
 
@@ -131,20 +129,14 @@ def load_har(data: bytes, name: str) -> Capture:
         hdrs = [(h.get("name", "").lower(), h.get("value", "")) for h in resp.get("headers") or []]
         cookies = [c.get("name") for c in resp.get("cookies") or [] if c.get("name")]
         cookies += [v.split("=", 1)[0].strip() for k, v in hdrs if k == "set-cookie"]
-        init = e.get("_initiator") or {}
-        init_url = init.get("url")
-        if not init_url and isinstance(init.get("stack"), dict):
-            frames = init["stack"].get("callFrames") or []
-            init_url = frames[0].get("url") if frames else None
         r = Resource(
             url=url, method=req.get("method", "GET"), status=resp.get("status"), mime=mime,
             resource_type=(e.get("_resourceType") or "").lower(), headers=hdrs,
-            req_headers=[(h.get("name", "").lower(), h.get("value", "")) for h in req.get("headers") or []],
             body_sha256=sha256(body) if body else None, size=len(body) if body else 0,
             body=body if body and _keep_body(mime, url) and len(body) <= config.MAX_BODY_BYTES else None,
             ip=(e.get("serverIPAddress") or "").strip("[]") or None,
             redirect_url=resp.get("redirectURL") or None, started=e.get("startedDateTime"),
-            initiator=init_url, source=f"har:{name}", cookies=[c for c in cookies if c],
+            source=f"har:{name}", cookies=[c for c in cookies if c],
         )
         cap.resources.append(r)
         if r.resource_type == "document" or (not r.resource_type and "html" in mime):

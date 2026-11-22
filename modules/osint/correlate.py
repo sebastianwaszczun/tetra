@@ -97,13 +97,6 @@ def cluster(records: list[dict], threshold: float = 0.75) -> dict:
     return {"clusters": [g for g in groups.values()], "edges": edges}
 
 
-def match_new(new: dict, corpus: list[dict], top: int = 5) -> list[dict]:
-    """Nowy materiał vs znany zbiór – ranking najbliższych incydentów z uzasadnieniem."""
-    df = doc_freq(corpus + [new])
-    res = [compare(new, r, df) for r in corpus]
-    return sorted(res, key=lambda c: -c["score"])[:top]
-
-
 def _main():
     ap = argparse.ArgumentParser(description="Łączenie rekordów OSINT w kampanie (referencyjnie)")
     ap.add_argument("jsonl")

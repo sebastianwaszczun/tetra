@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from collections import defaultdict
 from contextlib import contextmanager
 from typing import Any, Iterator
@@ -94,6 +95,17 @@ AUDIO_MIN_SHARED = 15           # tyle wspólnych hashy z próbki odcisku dźwi�
 FUZZY_KEYS = {"img_phash", "audio_lm"}
 
 _schema_ready = False
+_schema_lock = threading.Lock()
+
+
+def ensure_schema(conn: Any, sql: str, key: int) -> None:
+    """Schemat tworzony raz naraz: równoległe CREATE TABLE IF NOT EXISTS w Postgresie potrafią się
+    wywrócić (UniqueViolation na pg_type), gdy front, API i skaner łączą się jednocześnie."""
+    conn.execute("SELECT pg_advisory_lock(%s)", (key,))
+    try:
+        conn.execute(sql)
+    finally:
+        conn.execute("SELECT pg_advisory_unlock(%s)", (key,))
 
 
 @contextmanager
@@ -103,8 +115,10 @@ def connect() -> Iterator[Any]:
     from fakecollector.db import pg
     with pg() as conn:
         if not _schema_ready:
-            conn.execute(SCHEMA_SQL)
-            _schema_ready = True
+            with _schema_lock:
+                if not _schema_ready:
+                    ensure_schema(conn, SCHEMA_SQL, 7301)
+                    _schema_ready = True
         yield conn
 
 

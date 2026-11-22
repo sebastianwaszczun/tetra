@@ -41,8 +41,12 @@ def normalize_url(url: str) -> str:
     query = [(k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True)
              if k.lower() not in TRACKING_PARAMS and not k.lower().startswith(TRACKING_PREFIXES)]
     host = (parts.hostname or "").lower().removeprefix("www.")
-    if parts.port and parts.port not in (80, 443):
-        host = f"{host}:{parts.port}"
+    try:
+        port = parts.port
+    except ValueError:      # „adres” z tekstu, np. „portal:internet” – port nie jest liczbą
+        port = None
+    if port and port not in (80, 443):
+        host = f"{host}:{port}"
     path = parts.path.rstrip("/") or ""
     return urlunsplit(("https", host, path, urlencode(sorted(query)), ""))
 

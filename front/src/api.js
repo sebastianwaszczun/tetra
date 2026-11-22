@@ -16,3 +16,6 @@ export const postJSON = (path, data) =>
   }).then(parse)
 
 export const imageUrl = (materialId, n) => `${API_URL}/materials/${materialId}/images/${n}`
+
+// Obrazek do rysowania na canvasie/WebGL: osobny adres (inny wpis w pamięci podręcznej niż <img>) i tryb CORS.
+export const canvasImageUrl = (materialId, n) => `${imageUrl(materialId, n)}?canvas=1`

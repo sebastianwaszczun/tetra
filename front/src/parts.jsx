@@ -133,8 +133,14 @@ export function WhyPanel({ selected, labels = {}, onDecision }) {
       <Box className="panel" double>
         <h3 className="panel-title">Wspólny ślad</h3>
         {selected.entityKind && <dl className="facts"><dt>rodzaj</dt><dd>{selected.entityKind}</dd></dl>}
-        <p className="panel-lead mono">{selected.value ?? selected.label}</p>
-        {selected.materials != null && <Note>Występuje w: {materialy(selected.materials)}.</Note>}
+        {selected.values?.length > 1 ? (
+          <>
+            <p className="panel-lead">{selected.values.length} wspólnych śladów tego rodzaju</p>
+            <ul className="reasons mono">{selected.values.slice(0, 12).map((v) => <li key={v}>{v}</li>)}</ul>
+            {selected.values.length > 12 && <Note>…i {selected.values.length - 12} więcej.</Note>}
+          </>
+        ) : <p className="panel-lead mono">{selected.value ?? selected.label}</p>}
+        {selected.materials != null && <Note>Łączy: {materialy(selected.materials)}.</Note>}
       </Box>
     )
   }

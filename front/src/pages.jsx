@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Suspense, lazy, useMemo, useState } from 'react'
 
 import Graph from './Graph.jsx'
 import { Decision, Images, MaterialFacts, Modules, WhyPanel } from './parts.jsx'
@@ -6,6 +6,8 @@ import { href } from './route.js'
 import {
   Badge, Box, ErrorNote, Loading, Note, SIGNALS, Score, ago, materialy, shortDate, useFetch,
 } from './ui.jsx'
+
+const Graph3D = lazy(() => import('./Graph3D.jsx'))
 
 const reviewCount = (summary) => Number(/\((\d+) do weryfikacji\)/.exec(summary ?? '')?.[1] ?? 0)
 const labelsOf = (graph) => Object.fromEntries((graph?.nodes ?? []).map((n) => [n.id, n.label]))
@@ -127,7 +129,8 @@ export function CampaignsPage() {
   const [review, setReview] = useState(false)
   const [q, setQ] = useState('')
   const [selected, setSelected] = useState(null)
-  const map = useFetch(tab === 'mapa' ? '/graph?entities=false' : null)
+  const [dim, setDim] = useState('2d')
+  const map = useFetch(tab === 'mapa' ? '/graph' : null)
 
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase()
@@ -189,7 +192,18 @@ export function CampaignsPage() {
           <div>
             {map.loading && <Loading text="Rysuję mapę…" />}
             {map.error && <ErrorNote error={map.error} retry={map.reload} />}
-            {map.data && <Graph data={map.data} onSelect={setSelected} height={640} />}
+            <div className="dim-switch" role="group" aria-label="Widok mapy">
+              {[['2d', 'szkic 2D'], ['3d', 'przestrzeń 3D']].map(([k, label]) => (
+                <button key={k} type="button" className={'tab small' + (dim === k ? ' on' : '')} aria-pressed={dim === k}
+                        onClick={() => { setDim(k); setSelected(null) }}>{label}</button>
+              ))}
+            </div>
+            {map.data && dim === '2d' && <Graph data={map.data} onSelect={setSelected} height={640} />}
+            {map.data && dim === '3d' && (
+              <Suspense fallback={<Loading text="Przestawiam kartotekę w 3D…" />}>
+                <Graph3D data={map.data} onSelect={setSelected} height={640} />
+              </Suspense>
+            )}
           </div>
           <WhyPanel selected={selected} labels={labelsOf(map.data)} />
         </div>
@@ -246,7 +260,7 @@ export function CampaignPage({ id }) {
         <div>
           {g.loading && !g.data && <Loading text="Rysuję graf…" />}
           {g.error && <ErrorNote error={g.error} retry={g.reload} />}
-          {g.data && <Graph data={g.data} onSelect={setSelected} hideTypes={['campaign', 'operator']} layout="concentric" />}
+          {g.data && <Graph data={g.data} onSelect={setSelected} hideTypes={['campaign', 'operator']} />}
         </div>
         <WhyPanel selected={selected} labels={labels} onDecision={members.length > 1 ? afterDecision : null} />
       </div>

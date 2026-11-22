@@ -204,3 +204,13 @@
   .result { padding: 20px 18px; }
   .split > div { min-width: 0; }
 }
+
+/* ---------------------------------------------------------------- graf (force-graph + Rough.js) */
+.graph-canvas canvas { display: block; }
+.graph-frame.dark::before { background: #1d1a17; }
+.graph-fit.light { background: #1d1a17; color: #F3EBDC; }
+.dim-switch { display: flex; gap: 16px; margin: 0 0 10px; }
+.tab.small { font-size: 18px; min-height: 36px; }
+.legend-item svg { flex: none; }
+.tip3d { padding: 4px 8px; background: #F3EBDC; color: #161412; border: 1.6px solid #161412; border-radius: 6px 10px 5px 9px; font-family: 'Patrick Hand', cursive; font-size: 15px; max-width: 280px; }
+.reasons.mono li { font-size: 13px; }

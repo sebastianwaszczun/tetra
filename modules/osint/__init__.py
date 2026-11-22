@@ -1,6 +1,6 @@
 """Moduł OSINT – ślady infrastrukturalne stron ze scamowych reklam.
 
-    from osint import analyze_files, analyze_url, analyze_path
+    from osint import analyze_files, analyze_path
     rec = analyze_path("data/incydenty/36")         # folder incydentu (HAR + HTML + ...)
     rec["pivots"]                                    # cechy do łączenia w kampanie
 """
@@ -11,7 +11,7 @@ from pathlib import Path
 from .capture import Capture, load_bytes, load_dir
 from .pipeline import SCHEMA_VERSION, analyze_capture
 
-__all__ = ["analyze_files", "analyze_url", "analyze_path", "SCHEMA_VERSION"]
+__all__ = ["analyze_files", "analyze_path", "SCHEMA_VERSION"]
 
 
 def analyze_files(files: list[tuple[str, bytes]], url: str | None = None, enrich: bool = True,
@@ -27,10 +27,6 @@ def analyze_files(files: list[tuple[str, bytes]], url: str | None = None, enrich
         cap.merge(_live(url, render))
         cap.page_url = cap.page_url or url
     return analyze_capture(cap, do_enrich=enrich, do_ct=ct)
-
-
-def analyze_url(url: str, enrich: bool = True, ct: bool | None = None, render: bool = False) -> dict:
-    return analyze_capture(_live(url, render), do_enrich=enrich, do_ct=ct)
 
 
 def analyze_path(path: str | Path, enrich: bool = True, ct: bool | None = None) -> dict:

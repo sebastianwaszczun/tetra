@@ -20,7 +20,7 @@ from typing import Any, Callable
 from . import har as har_mod
 from .dedup import DedupIndex, fingerprint, sha256_text
 from .detect import HTML_EXT, IMAGE_EXT, VIDEO_EXT, AUDIO_EXT, detect_input
-from .models import (AUDIO, FRAME, HAR, HTML, IMAGE, JSON, SCREENSHOT, TEXT, URL, VIDEO,
+from .models import (AUDIO, FRAME, HAR, HTML, IMAGE, JSON, SCREENSHOT, TEXT, VIDEO,
                      Incident)
 
 log = logging.getLogger(__name__)

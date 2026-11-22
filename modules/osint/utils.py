@@ -80,6 +80,7 @@ COMMODITY_DOMAINS = {
     "google-analytics.com", "doubleclick.net", "googlesyndication.com", "googleadservices.com",
     "youtube.com", "ytimg.com", "youtube-nocookie.com", "ggpht.com", "googleusercontent.com",
     "facebook.com", "facebook.net", "fbcdn.net", "fb.com", "instagram.com", "cdninstagram.com",
+    "fb.me", "fb.watch", "fb.gg", "m.me", "messenger.com", "whatsapp.com", "wa.me", "threads.net",
     "jsdelivr.net", "cdnjs.cloudflare.com", "cloudflare.com", "cloudflareinsights.com",
     "unpkg.com", "jquery.com", "bootstrapcdn.com", "jsdelivr.com", "fontawesome.com",
     "unsplash.com", "pexels.com", "pixabay.com", "gravatar.com", "wp.com", "w3.org",

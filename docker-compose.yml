@@ -40,7 +40,7 @@ services:
       retries: 30
 
   # Python + ML: InsightFace, facetorch, CLIP/SigLIP, sentence-transformers, OCR,
-  # SpeechBrain, MinHash/LSH, HDBSCAN, narzędzia OSINT. Startuje JupyterLab.
+  # SpeechBrain, MinHash, narzędzia OSINT. Startuje JupyterLab.
   app:
     build:
       context: .

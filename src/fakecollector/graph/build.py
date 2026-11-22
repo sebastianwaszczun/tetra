@@ -108,7 +108,7 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
 
         mats = conn.execute(
             """SELECT id, source, title, domain, status, campaign_id, assignment, assignment_score, persons,
-                      persons_visual, input_type, created_at, n_words, text_origin
+                      input_type, created_at, n_words, text_origin
                FROM materials WHERE id = ANY(%s)""", (ids,)).fetchall()
         camp_ids = sorted({m[5] for m in mats if m[5] is not None})
         camps = conn.execute("""SELECT id, label, summary, size, operator_group, domains, persons
@@ -141,7 +141,7 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
             edge(f"campaign:{cid}", f"operator:{op}", "operator", "ten sam operator")
 
     # ---- materiały
-    for (mid, source, title, domain, status, cid, assignment, ascore, persons, pvis, itype, created, nw,
+    for (mid, source, title, domain, status, cid, assignment, ascore, persons, itype, created, nw,
          origin) in mats:
         node(f"material:{mid}", "material", _short(title or source or mid, 50), material_id=mid, source=source,
              title=title, domain=domain, status=status, assignment=assignment, score=ascore,

@@ -41,14 +41,8 @@ class ReklamaMeta(Model):
     tytuly: list[str] = Field(default_factory=list)
     opisy: list[str] = Field(default_factory=list)
     podpisy: list[str] = Field(default_factory=list)
-    utworzona: str | None = None
     start: str | None = None
-    koniec: str | None = None
-    zasieg_ue: int | None = None
-    jezyki: list[str] = Field(default_factory=list)
-    platformy: list[str] = Field(default_factory=list)
     wiek: list[str] = Field(default_factory=list)
-    plec: str | None = None
     lokalizacje: list[str] = Field(default_factory=list)
 
     @classmethod
@@ -63,14 +57,8 @@ class ReklamaMeta(Model):
             tytuly=list(r.get("ad_creative_link_titles") or []),
             opisy=list(r.get("ad_creative_link_descriptions") or []),
             podpisy=list(r.get("ad_creative_link_captions") or []),
-            utworzona=r.get("ad_creation_time"),
             start=r.get("ad_delivery_start_time"),
-            koniec=r.get("ad_delivery_stop_time"),
-            zasieg_ue=r.get("eu_total_reach"),
-            jezyki=list(r.get("languages") or []),
-            platformy=list(r.get("publisher_platforms") or []),
             wiek=[str(w) for w in r.get("target_ages") or []],
-            plec=r.get("target_gender"),
             lokalizacje=[str(l.get("name")) for l in r.get("target_locations") or [] if l.get("name")],
         )
 

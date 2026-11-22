@@ -84,12 +84,22 @@ npm run dev                               # http://localhost:5173 (adres API: VI
 | `POST /analyze` (multipart: `text`, `files`) | analiza materiału, zapis, `assignment` (kampania, status, wynik, przesłanki), `candidates` |
 | `GET /stats` | liczby: materiały, kampanie, operatorzy, do weryfikacji |
 | `GET /campaigns`, `GET /campaigns/{id}` | kampanie; szczegóły z materiałami, powiązaniami i kampaniami tego samego operatora |
-| `GET /materials`, `GET /materials/{id}`, `/materials/{id}/candidates` | rekordy materiałów (bez wektorów) i podobne materiały |
+| `GET /materials/{id}`, `GET /materials/{id}/images` | rekord materiału (bez wektorów), zrzuty i klatki |
+| `POST /materials/{id}/decision` | decyzja analityka: `potwierdz` / `odrzuc` / `cofnij` |
 | `GET /graph` (`?campaign_id=`, `?operator=`, `?material_id=`) | graf `{nodes, edges, stats, legend}` dla Cytoscape / vis-network / react-force-graph |
 | `GET /compare?a=&b=` | porównanie dwóch materiałów wszystkimi modułami |
-| `POST /campaigns/rebuild`, `POST /graph/sync` | przeliczenie kampanii, kopia grafu w Neo4j |
-| `GET /eval` (`?markdown=true`), `POST /eval/run` | raport jakości grupowania / uruchomienie ewaluacji |
+| `GET /adlib/status`, `GET /adlib/ads` | stan skanera Biblioteki Reklam i znalezione reklamy |
 | `POST /text/analyze`, `/image/analyze`, `/image/compare`, `/av/compare` | pojedyncze moduły (do testów) |
+
+Operacje administracyjne są w wierszu poleceń (kontener `app`, `api` albo `scheduler`), nie w publicznym API:
+
+```bash
+python -m fakecollector.grouping rebuild          # przeliczenie kampanii dla całej bazy
+python -m fakecollector.graph sync                # kopia grafu w Neo4j
+python -m fakecollector.eval run | show           # ewaluacja jakości grupowania
+python -m fakecollector.worker --raz | --ponow    # skan Biblioteki Reklam teraz / ponowna analiza reklam bez rekordu
+python -m fakecollector.record delete <id>        # usunięcie materiału
+```
 
 `POST /analyze` trwa od kilku sekund do 1–2 minut (OSINT z DNS/WHOIS, modele obrazu, transkrypcja filmu) –
 front musi czekać na odpowiedź. Przełączniki: `fetch`, `osint`, `av`, `asr`, `image`, `save`, `group`.

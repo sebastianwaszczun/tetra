@@ -174,40 +174,9 @@ def _skaner():
         return _skaner_obj
 
 
-@app.post("/adlib/scan", status_code=202, tags=["skaner Biblioteki Reklam"],
-          summary="Skan Biblioteki Reklam Meta teraz (w tle)")
-def adlib_scan(
-    fraza: Optional[str] = None,
-    limit: Optional[int] = None,
-) -> dict[str, Any]:
-    """Uruchamia ten sam skan co harmonogram. `fraza` zastępuje reguły jednym zapytaniem,
-    `limit` ogranicza liczbę reklam wysłanych do analizy. Postęp: GET /adlib/status."""
-    skaner = _skaner()
-    if skaner.magazyn.trwajacy_skan():
-        raise HTTPException(409, "Skan już trwa – sprawdź GET /adlib/status.")
-    threading.Thread(target=skaner.skanuj, kwargs={"wyzwalacz": "api", "fraza": fraza, "limit": limit},
-                     daemon=True).start()
-    return {"status": "uruchomiony", "postep": "/adlib/status", "reklamy": "/adlib/ads"}
-
-
 @app.get("/adlib/status", tags=["skaner Biblioteki Reklam"], summary="Stan skanera: ostatnie skany, liczby, token")
 def adlib_status() -> dict[str, Any]:
     return _skaner().status()
-
-
-@app.post("/adlib/tropy", tags=["skaner Biblioteki Reklam"], summary="Dodaj trop: stronę albo frazę do obserwacji")
-def adlib_trop(
-    rodzaj: Literal["strona", "fraza"],
-    wartosc: str,
-    opis: str = "",
-) -> dict[str, Any]:
-    """`strona` to page_id reklamodawcy z Biblioteki Reklam (każda jego nowa reklama trafi do analizy),
-    `fraza` to dodatkowe słowo do wyszukiwania. Działa od następnego skanu."""
-    wartosc = wartosc.strip()
-    if not wartosc or (rodzaj == "strona" and not wartosc.isdigit()):
-        raise HTTPException(400, "Strona to numeryczne page_id, fraza nie może być pusta.")
-    _skaner().magazyn.dodaj_trop(rodzaj, wartosc, "reczny", opis)
-    return {"dodano": {"rodzaj": rodzaj, "wartosc": wartosc}}
 
 
 @app.get("/adlib/ads", tags=["skaner Biblioteki Reklam"], summary="Reklamy znalezione przez skaner")
@@ -296,41 +265,12 @@ def analyze(
 
 # ----------------------------------------------------------------------------- rekordy materiałów
 
-@app.get("/materials", tags=["rekord materiału"], summary="Lista zapisanych materiałów")
-def materials(limit: int = 100, offset: int = 0) -> dict[str, Any]:
-    try:
-        return {"count": record_module.count_materials(),
-                "items": record_module.list_materials(limit=limit, offset=offset)}
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
-
-
 @app.get("/materials/{material_id}", tags=["rekord materiału"], summary="Rekord materiału (bez wektorów)")
 def material(material_id: str) -> dict[str, Any]:
     rec = record_module.load_record(material_id)
     if rec is None:
         raise HTTPException(404, "Nie ma takiego materiału.")
     return record_module.front_view(rec)
-
-
-@app.get("/materials/{material_id}/candidates", tags=["rekord materiału"],
-         summary="Podobne materiały z bazy i powody trafienia")
-def material_candidates(material_id: str, limit: int = 20) -> dict[str, Any]:
-    if record_module.load_summary(material_id) is None:
-        raise HTTPException(404, "Nie ma takiego materiału.")
-    return {"material_id": material_id, "candidates": record_module.find_candidates(material_id, limit=limit)}
-
-
-@app.delete("/materials/{material_id}", tags=["rekord materiału"], summary="Usunięcie materiału z bazy")
-def material_delete(material_id: str) -> dict[str, Any]:
-    summary = record_module.load_summary(material_id)
-    if summary is None or not record_module.delete_material(material_id):
-        raise HTTPException(404, "Nie ma takiego materiału.")
-    if summary.get("campaign_id") is not None:      # pusta kampania znika, pozostałym odświeża się opis
-        from fakecollector.grouping.campaigns import refresh_campaign, refresh_operators
-        refresh_campaign(summary["campaign_id"])
-        refresh_operators()
-    return {"deleted": material_id}
 
 
 IMAGE_KINDS = {"screenshot": "zrzut", "image": "obraz ze strony", "frame": "klatka filmu"}
@@ -381,7 +321,7 @@ class DecisionRequest(BaseModel):
 
 @app.post("/materials/{material_id}/decision", tags=["kampanie"], summary="Decyzja analityka o przynależności")
 def material_decision(material_id: str, req: DecisionRequest = Body(...)) -> dict[str, Any]:
-    """Decyzja dotyczy par materiałów, więc przetrwa przeliczenie kampanii (`/campaigns/rebuild`)."""
+    """Decyzja dotyczy par materiałów, więc przetrwa przeliczenie kampanii (`python -m fakecollector.grouping rebuild`)."""
     from fakecollector.grouping.decisions import DecisionError, decide
     try:
         return decide(material_id, req.decision, req.note)
@@ -408,26 +348,6 @@ def campaign(campaign_id: int) -> dict[str, Any]:
     if c is None:
         raise HTTPException(404, "Nie ma takiej kampanii.")
     return c
-
-
-@app.post("/campaigns/rebuild", tags=["kampanie"], summary="Przeliczenie kampanii dla całej bazy")
-def campaigns_rebuild(dry_run: bool = False) -> dict[str, Any]:
-    """Porównuje materiały z kandydatami i składa kampanie od nowa. Dla kilkudziesięciu materiałów
-    trwa kilka minut (porównanie obrazów i nagrań). Po zapisie odświeża kopię grafu w Neo4j."""
-    result = grouping_module.rebuild(write=not dry_run)
-    if not dry_run:
-        try:
-            result["neo4j"] = graph_module.sync_neo4j()
-        except Exception as exc:  # noqa: BLE001 – Neo4j to tylko kopia do podglądu
-            result["neo4j_error"] = f"{exc.__class__.__name__}: {exc}"
-    return result
-
-
-@app.post("/materials/{material_id}/assign", tags=["kampanie"], summary="Przypisanie materiału do kampanii")
-def material_assign(material_id: str) -> dict[str, Any]:
-    if record_module.load_summary(material_id) is None:
-        raise HTTPException(404, "Nie ma takiego materiału.")
-    return grouping_module.assign_material(material_id)
 
 
 @app.get("/compare", tags=["kampanie"], summary="Porównanie dwóch zapisanych materiałów (wszystkie moduły)")
@@ -458,14 +378,6 @@ def graph(campaign_id: Optional[int] = None, operator: Optional[int] = None, mat
         raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
 
 
-@app.post("/graph/sync", tags=["graf"], summary="Kopia grafu w Neo4j (podgląd: http://localhost:7474)")
-def graph_sync() -> dict[str, Any]:
-    try:
-        return graph_module.sync_neo4j()
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(503, f"Neo4j niedostępny: {exc.__class__.__name__}: {exc}") from exc
-
-
 @app.get("/stats", tags=["graf"], summary="Liczby do pulpitu: materiały, kampanie, operatorzy, do weryfikacji")
 def stats() -> dict[str, Any]:
     from fakecollector.grouping.campaigns import connect
@@ -483,26 +395,3 @@ def stats() -> dict[str, Any]:
         raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
     keys = ("materials", "campaigns", "single_material_campaigns", "operators", "to_review", "unassigned", "domains")
     return dict(zip(keys, row))
-
-# ----------------------------------------------------------------------------- ewaluacja
-
-@app.get("/eval", tags=["ewaluacja"], summary="Ostatni raport jakości grupowania (metryki, ablacja, progi)")
-def eval_report(markdown: bool = False) -> Any:
-    """Raport z `python -m fakecollector.eval run` albo `POST /eval/run`. `markdown=true` – gotowa tabela."""
-    from fakecollector import eval as eval_module
-    report = eval_module.last_report()
-    if report is None:
-        raise HTTPException(404, "Brak raportu – uruchom POST /eval/run (wymaga data/labels.csv).")
-    return {"markdown": eval_module.to_markdown(report)} if markdown else report
-
-
-@app.post("/eval/run", tags=["ewaluacja"], summary="Uruchom ewaluację na materiałach z etykietami")
-def eval_run(fresh: bool = False, threshold: Optional[float] = None) -> dict[str, Any]:
-    """Porównuje wszystkie pary materiałów z etykietami (data/labels.csv), liczy precyzję/czułość/F1 par,
-    ARI, przypisywanie nowych materiałów, ablację modułów i przegląd progów. Pierwsze uruchomienie trwa
-    kilka minut (porównania), kolejne – sekundy (wyniki par są zapisane; `fresh=true` liczy od nowa)."""
-    from fakecollector import eval as eval_module
-    try:
-        return eval_module.run(threshold=threshold, fresh=fresh)
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(400, str(exc)) from exc

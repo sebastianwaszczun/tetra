@@ -102,8 +102,16 @@ def cmd_candidates(a: argparse.Namespace) -> int:
 
 
 def cmd_delete(a: argparse.Namespace) -> int:
-    from . import delete_material
-    print("usunięto" if delete_material(a.id) else "nie znaleziono")
+    from . import delete_material, load_summary
+    summary = load_summary(a.id)
+    if summary is None or not delete_material(a.id):
+        print("nie znaleziono")
+        return 0
+    if summary.get("campaign_id") is not None:      # pusta kampania znika, pozostałym odświeża się opis
+        from fakecollector.grouping.campaigns import refresh_campaign, refresh_operators
+        refresh_campaign(summary["campaign_id"])
+        refresh_operators()
+    print("usunięto")
     return 0
 
 

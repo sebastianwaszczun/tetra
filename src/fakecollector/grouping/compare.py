@@ -122,7 +122,7 @@ def _text(fa: dict, fb: dict) -> dict[str, Any] | None:
 
 
 def _osint(fa: dict, fb: dict, ctx: Context) -> dict[str, Any] | None:
-    from osint.correlate import compare
+    from fakecollector.features.osint.correlate import compare
     r = compare(fa, fb, ctx.osint_df)
     best: dict[str, dict] = {}            # w obrębie rodzaju liczy się najmocniejszy ślad
     skipped = []

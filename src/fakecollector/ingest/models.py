@@ -27,7 +27,7 @@ JSON = "json"              # metadane (metadata.json, .info.json, dns_ssl.json�
 # Który moduł cech dostaje które składniki
 ROUTES: dict[str, set[str]] = {
     "text": {TEXT},
-    "osint": {URL, HAR, HTML, JSON},   # moduł OSINT (modules/osint) sam czyta też zasoby z *_files
+    "osint": {URL, HAR, HTML, JSON},   # moduł OSINT sam czyta też zasoby z *_files
     "image": {SCREENSHOT, IMAGE, FRAME},
     "av": {VIDEO, AUDIO},
 }

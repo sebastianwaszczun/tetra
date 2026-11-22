@@ -15,6 +15,8 @@ from collections import defaultdict
 from contextlib import contextmanager
 from typing import Any, Iterator
 
+from fakecollector.features.osint.utils import hamming_hex
+
 from .build import KEY_WEIGHTS, MaterialRecord
 
 log = logging.getLogger(__name__)
@@ -233,10 +235,6 @@ def count_materials() -> int:
 
 # ============================================================================ kandydaci
 
-def _hamming_hex(a: str, b: str) -> int:
-    return bin(int(a, 16) ^ int(b, 16)).count("1")
-
-
 def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
     """Materiały z bazy, które mogą należeć do tej samej kampanii, z powodami trafienia.
 
@@ -277,7 +275,7 @@ def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
                                   "WHERE kind = 'img_phash' AND material_id <> %s", (material_id,)).fetchall()
             best: dict[str, int] = {}
             for other, value in others:
-                d = min(_hamming_hex(value, h) for h in own)
+                d = min(hamming_hex(value, h) for h in own)
                 if d <= PHASH_MAX_DISTANCE and d < best.get(other, 65):
                     best[other] = d
             for other, d in best.items():

@@ -1,8 +1,8 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
-import './index.css'
-import './views.css'
+import './styles/base.css'
+import './styles/kartoteka.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

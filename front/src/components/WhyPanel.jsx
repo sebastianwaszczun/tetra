@@ -1,10 +1,6 @@
-import { useState } from 'react'
-
-import { imageUrl, postJSON } from './api.js'
-import { href } from './route.js'
-import {
-  Badge, Box, ErrorNote, Loading, MODULES, Note, PERSUASION, Score, ago, materialy, useFetch,
-} from './ui.jsx'
+import { href } from '../lib/route.js'
+import Decision from './Decision.jsx'
+import { Badge, Box, ErrorNote, Loading, MODULES, Note, Score, ago, materialy, useFetch } from './ui.jsx'
 
 const LINK_TYPES = new Set(['ta_sama_kampania', 'do_weryfikacji', 'ten_sam_operator'])
 const MODULE_ORDER = ['text', 'image', 'osint', 'av']
@@ -48,7 +44,7 @@ function ModuleBreakdown({ a, b, operator = false }) {
   )
 }
 
-export function WhyPanel({ selected, labels = {}, onDecision }) {
+export default function WhyPanel({ selected, labels = {}, onDecision }) {
   if (!selected) {
     return (
       <Box className="panel" double>
@@ -152,120 +148,3 @@ export function WhyPanel({ selected, labels = {}, onDecision }) {
     </Box>
   )
 }
-
-// ---------------------------------------------------------------------------- decyzja analityka
-
-export function Decision({ materialId, assignment, onDone, compact = false }) {
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-  const decided = assignment === 'potwierdzony' || assignment === 'odrzucony'
-
-  const send = (decision) => {
-    setBusy(true)
-    setError(null)
-    postJSON(`/materials/${encodeURIComponent(materialId)}/decision`, { decision, note })
-      .then((res) => { setNote(''); onDone?.(res) })
-      .catch(setError)
-      .finally(() => setBusy(false))
-  }
-
-  return (
-    <div className={'decision' + (compact ? ' compact' : '')}>
-      {!compact && <h4 className="panel-sub">Decyzja analityka</h4>}
-      {!decided && !compact && (
-        <input className="note-input" placeholder="Notatka (opcjonalnie)" value={note}
-               onChange={(e) => setNote(e.target.value)} disabled={busy} />
-      )}
-      <div className="decision-btns">
-        {decided ? (
-          <button className="btn ghost" type="button" disabled={busy} onClick={() => send('cofnij')}>Cofnij decyzję</button>
-        ) : (
-          <>
-            <button className="btn" type="button" disabled={busy} onClick={() => send('potwierdz')}>Potwierdź</button>
-            <button className="btn ghost" type="button" disabled={busy} onClick={() => send('odrzuc')}>
-              {assignment === 'do_weryfikacji' ? 'Odrzuć' : 'Wyłącz z kampanii'}
-            </button>
-          </>
-        )}
-      </div>
-      {error && <ErrorNote error={error} />}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------- materiał
-
-function Chips({ items, tone = '' }) {
-  if (!items?.length) return null
-  return <span className="chips">{items.map((x) => <span className={'chip-s ' + tone} key={x}>{x}</span>)}</span>
-}
-
-export function MaterialFacts({ m }) {
-  const f = m.features ?? {}
-  const t = f.text, o = f.osint, im = f.image, av = f.av
-  const persuasion = Object.entries(t?.persuasion ?? {}).filter(([, v]) => v).map(([k]) => PERSUASION[k] ?? k)
-  const domains = (o?.domains ?? []).filter((d) => d.role !== 'commodity' && d.registered_domain).slice(0, 4)
-  return (
-    <dl className="facts wide">
-      {t?.narrative?.label && <><dt>narracja</dt><dd>{t.narrative.label}</dd></>}
-      {persuasion.length > 0 && <><dt>presja</dt><dd><Chips items={persuasion} tone="red" /></dd></>}
-      {(m.persons?.length > 0 || m.persons_visual?.length > 0) && (
-        <><dt>osoby</dt><dd><Chips items={[...new Set([...(m.persons ?? []), ...(m.persons_visual ?? [])])]} /></dd></>
-      )}
-      {m.brands?.length > 0 && <><dt>marki</dt><dd><Chips items={m.brands} /></dd></>}
-      {t?.money?.length > 0 && <><dt>kwoty</dt><dd>{t.money.slice(0, 4).join(', ')}</dd></>}
-      {domains.length > 0 && (
-        <><dt>domeny</dt><dd>{domains.map((d) => (
-          <span className="dom" key={d.domain}>
-            {d.domain}
-            {d.age_days_at_observation != null && <em> · {d.age_days_at_observation} dni</em>}
-            {d.rdap?.registrar && <em> · {d.rdap.registrar}</em>}
-            {d.status_flags?.length > 0 && <em className="red"> · {d.status_flags.join(', ')}</em>}
-          </span>
-        ))}</dd></>
-      )}
-      {o?.pivots?.length > 0 && <><dt>ślady OSINT</dt><dd>{o.pivots.length}</dd></>}
-      {im?.logo?.length > 0 && <><dt>logo</dt><dd><Chips items={im.logo} /></dd></>}
-      {im?.deepfake_score != null && <><dt>deepfake</dt><dd>{(im.deepfake_score * 100).toFixed(0)}% (orientacyjnie)</dd></>}
-      {im?.qr?.length > 0 && <><dt>kody QR</dt><dd>{im.qr.join(', ')}</dd></>}
-      {av?.transcript && <><dt>transkrypcja</dt><dd className="quote">„{av.transcript.slice(0, 240)}{av.transcript.length > 240 ? '…' : ''}”</dd></>}
-    </dl>
-  )
-}
-
-export function Modules({ modules }) {
-  if (!modules) return null
-  return (
-    <span className="modules">
-      {Object.entries(MODULES).map(([k, name]) => {
-        const s = modules[k]?.status
-        const cls = s === 'ok' ? 'ok' : s === 'błąd' ? 'bad' : 'mute'
-        return <span className={'mod ' + cls} key={k} title={modules[k]?.error ?? modules[k]?.reason ?? ''}>
-          {cls === 'ok' ? '✓' : cls === 'bad' ? '✗' : '–'} {name}
-        </span>
-      })}
-    </span>
-  )
-}
-
-export function Images({ materialId }) {
-  const { data } = useFetch(`/materials/${encodeURIComponent(materialId)}/images`)
-  const items = data?.items ?? []
-  if (!items.length) return null
-  const shots = items.filter((i) => i.kind !== 'frame').slice(0, 8)
-  const frames = items.filter((i) => i.kind === 'frame')
-  const step = Math.max(1, Math.ceil(frames.length / 6))
-  const shown = [...shots, ...frames.filter((_, i) => i % step === 0).slice(0, 6)]
-  return (
-    <div className="thumbs">
-      {shown.map((i) => (
-        <a className="thumb" key={i.n} href={imageUrl(materialId, i.n)} target="_blank" rel="noreferrer" title={`${i.label}: ${i.name}`}>
-          <img src={imageUrl(materialId, i.n)} alt={`${i.label} ${i.name}`} loading="lazy" />
-          <span>{i.label}</span>
-        </a>
-      ))}
-    </div>
-  )
-}
-

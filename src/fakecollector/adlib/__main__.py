@@ -1,8 +1,8 @@
 """Harmonogram skanera Biblioteki Reklam (usługa `scheduler` w docker-compose).
 
-    python -m fakecollector.worker            # skan co kilka godzin + zadania dobowe
-    python -m fakecollector.worker --raz      # jeden skan i koniec
-    python -m fakecollector.worker --ponow    # ponowna analiza reklam, których wynik nie trafił do kartoteki
+    python -m fakecollector.adlib            # skan co kilka godzin + zadania dobowe
+    python -m fakecollector.adlib --raz      # jeden skan i koniec
+    python -m fakecollector.adlib --ponow    # ponowna analiza reklam, których wynik nie trafił do kartoteki
 """
 from __future__ import annotations
 
@@ -16,11 +16,11 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from fakecollector.adlib import Skaner
 from fakecollector.adlib.model import FiltrTokenu
 
-log = logging.getLogger("fakecollector.worker")
+log = logging.getLogger("fakecollector.adlib")
 
 
 def main(argv: list[str] | None = None) -> None:
-    p = argparse.ArgumentParser(description="Skaner Biblioteki Reklam Meta")
+    p = argparse.ArgumentParser(prog="python -m fakecollector.adlib", description="Skaner Biblioteki Reklam Meta")
     p.add_argument("--raz", action="store_true", help="jeden skan i koniec")
     p.add_argument("--fraza", help="szukaj tylko tej frazy (z --raz)")
     p.add_argument("--limit", type=int, help="najwyżej tyle reklam do analizy")

@@ -13,7 +13,6 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlsplit
 
 from .pipeline import ModuleResults
 
@@ -49,24 +48,11 @@ class MaterialRecord:
 
 # ============================================================================ pomocnicze
 
-def _host(url: str | None) -> str | None:
-    if not url:
-        return None
-    host = (urlsplit(url if "://" in url else "https://" + url).hostname or "").lower()
-    return host[4:] if host.startswith("www.") else host or None
-
-
-def _registered(host: str | None) -> str | None:
-    """Domena rejestrowalna (example.co.uk); tldextract, jeśli jest, inaczej dwa ostatnie człony."""
-    if not host:
-        return None
-    try:
-        import tldextract
-        ext = tldextract.extract(host)
-        return ext.registered_domain or host
-    except Exception:  # noqa: BLE001
-        parts = host.split(".")
-        return ".".join(parts[-2:]) if len(parts) >= 2 else host
+def _registered_domain(url: str | None) -> str | None:
+    """Domena rejestrowalna adresu (example.co.uk), liczona tak samo jak w module OSINT."""
+    from fakecollector.features.osint.utils import host_of, split_host
+    host = host_of(url if url and "://" in url else f"https://{url}") if url else ""
+    return split_host(host)["registered_domain"] if host else None
 
 
 def lsh_bands(signature: list[int] | None) -> list[str]:
@@ -99,7 +85,7 @@ def build_record(inc: Any, res: ModuleResults) -> MaterialRecord:
     domains = sorted(d for d in set((o or {}).get("landing", {}).get("registered_domains") or [])
                      if not is_common_domain(d))
     final_url = inc.final_url or (inc.urls[0] if inc.urls else None)
-    main_domain = domains[0] if domains else _registered(_host(final_url))
+    main_domain = domains[0] if domains else _registered_domain(final_url)
     if main_domain and is_common_domain(main_domain):
         main_domain = None        # np. facebook.com z linku do Biblioteki Reklam – nie jest domeną scamu
 

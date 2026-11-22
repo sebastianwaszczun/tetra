@@ -8,7 +8,7 @@ Ocena pary (a, b):
   4. między rodzajami noisy-OR:  score = 1 − Π(1 − c_kind).
 Wynik jest w pełni wyjaśnialny: lista wspólnych pivotów z wkładem i opisem.
 
-    python -m osint.correlate records.jsonl --threshold 0.75
+    python -m fakecollector.features.osint.correlate records.jsonl --threshold 0.75
 """
 from __future__ import annotations
 

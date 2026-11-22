@@ -3,11 +3,11 @@ import ForceGraph3D from 'react-force-graph-3d'
 import * as THREE from 'three'
 import SpriteText from 'three-spritetext'
 
-import { canvasImageUrl, getJSON } from './api.js'
 
-import { Legend, radius } from './Graph.jsx'
-import { PAIR_EDGES, asSelection, gravity, prepareGraph } from './graphData.js'
-import { Box } from './ui.jsx'
+import { Box } from '../components/ui.jsx'
+import { Legend, radius } from './Graph2D.jsx'
+import { PAIR_EDGES, asSelection, gravity, idOf, materialIdOf, prepareGraph, shorten } from './prepare.js'
+import { loadThumb } from './thumbs.js'
 
 // Widok 3D mapy kartoteki: „nocne biurko detektywa” – ciemne tło, ciepłe kolory, płynące powiązania.
 const COLOR = {
@@ -17,28 +17,6 @@ const COLOR = {
 const LINK = {
   ta_sama_kampania: 'rgba(243,235,220,0.85)', do_weryfikacji: 'rgba(224,170,80,0.85)',
   ten_sam_operator: 'rgba(224,72,72,0.9)', operator: 'rgba(224,72,72,0.6)',
-}
-const idOf = (x) => (typeof x === 'object' ? x.id : x)
-const shorten = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
-
-// Miniatura zrzutu jako krążek na kuli materiału. crossOrigin: WebGL przyjmie obraz tylko za zgodą CORS API.
-const thumbs = new Map()
-function loadThumb(id) {
-  if (!thumbs.has(id)) {
-    thumbs.set(id, getJSON(`/materials/${encodeURIComponent(id)}/images`).then((d) => {
-      const items = d?.items ?? []
-      const pick = items.find((i) => i.kind === 'screenshot') ?? items.find((i) => i.kind === 'image') ?? items[0]
-      if (!pick) return null
-      return new Promise((resolve) => {
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => resolve(img)
-        img.onerror = () => resolve(null)
-        img.src = canvasImageUrl(id, pick.n)
-      })
-    }).catch(() => null))
-  }
-  return thumbs.get(id)
 }
 
 function discTexture(img) {
@@ -114,7 +92,7 @@ export default function Graph3D({ data, onSelect, height = 640 }) {
       const disc = new THREE.Sprite(new THREE.SpriteMaterial({ map: discTexture(null), toneMapped: false }))
       disc.scale.set(r * 2.4, r * 2.4, 1)
       group.add(disc)
-      loadThumb(n.meta.material_id ?? n.id.replace(/^material:/, '')).then((img) => {
+      loadThumb(materialIdOf(n)).then((img) => {
         if (!img) return
         disc.material.map.dispose()
         disc.material.map = discTexture(img)

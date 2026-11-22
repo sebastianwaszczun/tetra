@@ -1,5 +1,5 @@
-import { MaterialFacts, Modules } from './parts.jsx'
-import { href } from './route.js'
+import { href } from '../lib/route.js'
+import { MaterialFacts, Modules } from './MaterialInfo.jsx'
 import { Box, Note, Score, materialy } from './ui.jsx'
 
 const VERDICT = {

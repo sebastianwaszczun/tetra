@@ -1,8 +1,7 @@
 """Graf powiązań: kampanie, operatorzy, materiały i wspólne ślady (domeny, osoby, konta, kit, serwery).
 
 Graf powstaje z danych w Postgresie (rekordy, krawędzie z grupowania, klucze), więc działa także
-bez Neo4j. Format odpowiedzi pasuje do bibliotek grafowych (Cytoscape.js, vis-network,
-react-force-graph):
+bez Neo4j. Format odpowiedzi pasuje do bibliotek grafowych (react-force-graph, Cytoscape.js):
 
     {"nodes": [{"id": "material:ab12", "type": "material", "label": "…", "group": "campaign:3", "data": {…}}],
      "edges": [{"id": "…", "source": "material:ab12", "target": "campaign:3", "type": "w_kampanii",

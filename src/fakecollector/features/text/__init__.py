@@ -655,7 +655,7 @@ def _case_dirs(paths: list[str]) -> list[Path]:
 
 
 def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(description="Moduł tekstu FakeCollector")
+    ap = argparse.ArgumentParser(prog="python -m fakecollector.features.text", description="Moduł tekstu FakeCollector")
     ap.add_argument("paths", nargs="+", help="pliki, foldery przypadków albo całe paczki (data/BACKUP)")
     ap.add_argument("--compare", action="store_true", help="porównaj wszystkie pary")
     ap.add_argument("--top", type=int, default=20, help="ile najpodobniejszych par pokazać")
@@ -705,7 +705,3 @@ def main(argv: list[str] | None = None) -> None:
         Path(args.json).write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"\nZapisano cechy do {args.json}")
 
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.WARNING)
-    main()

@@ -1,6 +1,6 @@
 """Moduł OSINT – ślady infrastrukturalne stron ze scamowych reklam.
 
-    from osint import analyze_files, analyze_path
+    from fakecollector.features.osint import analyze_files, analyze_path
     rec = analyze_path("data/incydenty/36")         # folder incydentu (HAR + HTML + ...)
     rec["pivots"]                                    # cechy do łączenia w kampanie
 """

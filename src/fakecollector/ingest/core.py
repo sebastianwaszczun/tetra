@@ -49,12 +49,9 @@ def is_common_domain(url: str) -> bool:
     from urllib.parse import urlsplit
     host = (urlsplit(url if "://" in url else "https://" + url).hostname or "").lower()
     host = host[4:] if host.startswith("www.") else host
-    try:
-        from osint.utils import is_commodity  # type: ignore  # pełna lista z modułu OSINT
-        if is_commodity(host):
-            return True
-    except Exception:
-        pass
+    from fakecollector.features.osint.utils import is_commodity   # pełna lista z modułu OSINT
+    if is_commodity(host):
+        return True
     return host in COMMON_DOMAINS or any(host.endswith("." + d) for d in COMMON_DOMAINS)
 
 
@@ -577,16 +574,12 @@ def finalize(inc: Incident, o: Options) -> None:
 # ============================================================================ przekazanie do OSINT
 
 def run_osint(inc: Incident, enrich: bool = True) -> dict | None:
-    """Uruchamia moduł OSINT kolegów (modules/osint) na składnikach materiału.
+    """Uruchamia moduł OSINT (features/osint) na składnikach materiału.
 
     Folder przypadku dostaje w całości (OSINT sam czyta też zasoby z *_files), pozostałe
     materiały jako listę plików HAR/HTML/JSON plus adres, jeśli strony nie pobrano.
     """
-    try:
-        import osint  # type: ignore  # modules/osint – musi być na PYTHONPATH
-    except ImportError as exc:
-        inc.errors.append(f"moduł OSINT niedostępny: {exc}")
-        return None
+    from fakecollector.features import osint
     folder = inc.case_dir
     if inc.input_type in {"folder", "archive", "upload"} and folder:
         return osint.analyze_path(folder, enrich=enrich)

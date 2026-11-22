@@ -15,7 +15,7 @@ from test_filtr_i_reguly import SCAM, ZWYKLA
 
 
 def test_pakiet_rozpoznawany_przez_osint():
-    load_json = pytest.importorskip("osint.capture", reason="brak modułu OSINT (modules/) w PYTHONPATH").load_json
+    load_json = pytest.importorskip("fakecollector.features.osint.capture").load_json
 
     surowy = rekord("55", page_id="900", page_name="Ekspert Finansów", tresc=SCAM, tytul="Vitaflex Max",
                     podpis="zly-sklep.pl")

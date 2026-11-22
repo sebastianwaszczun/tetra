@@ -5,6 +5,10 @@
 const ENTITY = new Set(['domain', 'person', 'account', 'kit', 'infra'])
 const GROUPABLE = new Set(['account', 'kit', 'infra'])
 const ENTITY_EDGES = new Set(['uzywa', 'wymienia', 'pokazuje'])
+export const idOf = (x) => (typeof x === 'object' ? x.id : x)
+export const shorten = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
+export const materialIdOf = (node) => node.meta?.material_id ?? node.id.replace(/^material:/, '')
+
 export const PAIR_EDGES = new Set(['ta_sama_kampania', 'do_weryfikacji', 'ten_sam_operator'])
 
 export function prepareGraph(data, { hideTypes = [] } = {}) {

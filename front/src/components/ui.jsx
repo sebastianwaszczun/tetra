@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { getJSON } from './api.js'
+import { getJSON } from '../lib/api.js'
 
 export const ASSIGNMENT = {
   przypisany: { label: 'przypisany', tone: 'ok' },
@@ -50,6 +50,17 @@ export function Score({ value, label }) {
     <span className="score" title={label ?? `wynik ${value.toFixed(2)}`}>
       <span className="score-track"><span className="score-fill" style={{ width: `${pct}%` }} /></span>
       <span className="score-num">{value.toFixed(2)}</span>
+    </span>
+  )
+}
+
+// Etykiety w obrysie; `max` ucina listę i pokazuje „+N”.
+export function Chips({ items, max = Infinity, tone = '' }) {
+  if (!items?.length) return null
+  return (
+    <span className="chips">
+      {items.slice(0, max).map((x) => <span className={'chip-s ' + tone} key={x}>{x}</span>)}
+      {items.length > max && <span className="chip-s more-c">+{items.length - max}</span>}
     </span>
   )
 }

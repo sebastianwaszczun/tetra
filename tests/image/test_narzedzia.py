@@ -8,7 +8,7 @@ from PIL import Image, ImageDraw
 
 from fakecollector.features.image.warianty import generuj_warianty
 
-SKRYPTY = Path(__file__).resolve().parents[2] / "scripts"
+SKRYPTY = Path(__file__).resolve().parents[2] / "scripts" / "image"
 
 
 def test_warianty_i_podglad(tmp_path: Path) -> None:

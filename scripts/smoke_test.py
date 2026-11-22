@@ -27,11 +27,9 @@ ARGS = ap.parse_args()
 
 TMP = Path(tempfile.mkdtemp(prefix="smoke_"))
 os.environ["STORE_DIR"] = str(TMP / "store")
-os.environ.setdefault("ANALYZE_DUMP_DIR", str(TMP / "dump"))   # API zapisuje tu podgląd odpowiedzi
 if ARGS.fast:
     os.environ["TEXT_EMBEDDINGS"] = "0"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "modules"))
 
 DATA = Path(ARGS.data)
 BACKUP, DANE = DATA / "BACKUP", DATA / "DANE"
@@ -204,10 +202,6 @@ print("\nModuł OSINT" + (" (z DNS/WHOIS/TLS)" if ARGS.enrich else " (bez zapyta
 def osint_rec(name: str):
     key = f"osint:{name}"
     if key not in CACHE:
-        try:
-            import osint  # noqa: F401
-        except ImportError as e:
-            raise Skip(f"moduł OSINT niedostępny ({e})")
         from fakecollector.ingest import run_osint
         inc = ingest_case(name, ocr=False)
         rec = run_osint(inc, enrich=ARGS.enrich)
@@ -228,7 +222,7 @@ def _():
 @check("osint", "ta sama kampania (p1 ~ p2, ta sama domena) – wysoki wynik")
 def _():
     a, b = osint_rec("BACKUP/p1"), osint_rec("BACKUP/p2")
-    from osint.correlate import compare
+    from fakecollector.features.osint.correlate import compare
     r = compare(a, b)
     assert r["score"] >= 0.75, r["score"]
     return f"wynik {r['score']} ({r['label']})"
@@ -237,7 +231,7 @@ def _():
 @check("osint", "różne kampanie (p1 ~ p9) – niski wynik")
 def _():
     a, b = osint_rec("BACKUP/p1"), osint_rec("BACKUP/p9")
-    from osint.correlate import compare
+    from fakecollector.features.osint.correlate import compare
     r = compare(a, b)
     assert r["score"] < 0.5, r["score"]
     return f"wynik {r['score']} ({r['label']})"
@@ -334,7 +328,7 @@ def _():
     assert im["images_analyzed"] >= 1, im
     with_vec = sum(1 for it in im["items"] if it["cechy"].get("wektor"))
     if not ARGS.fast:
-        assert with_vec >= 1, "brak wektorów CLIP – pobierz modele: python scripts/pobierz_modele_obrazu.py " \
+        assert with_vec >= 1, "brak wektorów CLIP – pobierz modele: python scripts/image/pobierz_modele_obrazu.py " \
                               "--modele siglip2,clip,buffalo_l,yunet_sface,magface,facetorch"
     return f"{im['images_analyzed']} obrazów, wektorów {with_vec}, osoby na obrazach {im['persons_visual']}"
 

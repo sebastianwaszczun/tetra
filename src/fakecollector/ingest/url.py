@@ -11,17 +11,14 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from fakecollector.features.osint import config as osint_config
+from fakecollector.features.osint.live import UnsafeTarget, check_target
+
 log = logging.getLogger(__name__)
 
-try:  # te same nagłówki co moduł OSINT: mobilna przeglądarka z Facebooka omija część cloakingu
-    from osint import config as _osint_config  # type: ignore
-    USER_AGENT = _osint_config.USER_AGENT
-    REFERER = _osint_config.REFERER
-except Exception:
-    USER_AGENT = ("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/131.0.0.0 Mobile Safari/537.36 [FBAN/FB4A;FBAV/480.0.0.0;]")
-    REFERER = "https://l.facebook.com/"
-USER_AGENT = os.environ.get("FETCH_USER_AGENT", USER_AGENT)
+# te same nagłówki co moduł OSINT: mobilna przeglądarka z Facebooka omija część cloakingu
+USER_AGENT = os.environ.get("FETCH_USER_AGENT", osint_config.USER_AGENT)
+REFERER = osint_config.REFERER
 TIMEOUT_MS = int(os.environ.get("FETCH_TIMEOUT_MS", "30000"))
 SETTLE_MS = int(os.environ.get("FETCH_SETTLE_MS", "3000"))   # czas na przekierowania w JS
 
@@ -47,35 +44,6 @@ class FetchResult:
 def normalize_input_url(url: str) -> str:
     url = url.strip()
     return url if "://" in url else "https://" + url
-
-
-class UnsafeTarget(ValueError):
-    """Adres prowadzi do sieci prywatnej albo nie jest http(s) – nie otwieramy go."""
-
-
-def check_target(url: str) -> None:
-    """Ochrona przed otwieraniem adresów wewnętrznych (np. http://postgres:5432) przez podstawiony link."""
-    try:
-        from osint.live import UnsafeTarget as _OsintUnsafe, check_target as _check  # type: ignore
-    except Exception:
-        import ipaddress
-        import socket
-        from urllib.parse import urlsplit
-        sp = urlsplit(url)
-        if sp.scheme not in ("http", "https") or not sp.hostname:
-            raise UnsafeTarget("dozwolone tylko adresy http(s)")
-        try:
-            infos = socket.getaddrinfo(sp.hostname, sp.port or 443)
-        except socket.gaierror as exc:
-            raise UnsafeTarget(f"nie można rozwiązać hosta: {exc}") from exc
-        for info in infos:
-            if not ipaddress.ip_address(info[4][0]).is_global:
-                raise UnsafeTarget(f"host wskazuje na adres niepubliczny ({info[4][0]})")
-        return
-    try:
-        _check(url)
-    except _OsintUnsafe as exc:
-        raise UnsafeTarget(str(exc)) from exc
 
 
 def fetch(url: str, out_dir: str | Path, timeout_ms: int = TIMEOUT_MS) -> FetchResult:

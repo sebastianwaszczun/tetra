@@ -51,7 +51,7 @@ class TextAnalyzeRequest(BaseModel):
 
 
 class TextAnalyzeResponse(BaseModel):
-    features: dict[str, Any] = Field(description="Cechy tekstu z modułu tekstu (opis pól w TEXT.md).")
+    features: dict[str, Any] = Field(description="Cechy tekstu z modułu tekstu (opis pól w features/text/README.md).")
     page: Optional[dict[str, Any]] = Field(
         None, description="Metadane strony: tytuł, opis, nagłówki, linki wychodzące (tylko dla pola html).")
 
@@ -208,7 +208,7 @@ def analyze(
 ) -> dict[str, Any]:
     """Preprocessing -> moduły (AV, tekst, OSINT, obraz) -> rekord -> zapis -> kandydaci -> kampania.
 
-    Zwraca też pola starego stuba (`text`, `files_count`, `files`), żeby front działał bez zmian.
+    Na początku odpowiedzi jest opis tego, co przyszło (`text`, `files_count`, `files`).
     Funkcja jest synchroniczna – FastAPI uruchamia ją w osobnym wątku (Playwright, OCR i modele blokują).
     """
     text = (text or "").strip() or None
@@ -360,7 +360,7 @@ def compare(a: str, b: str) -> dict[str, Any]:
 
 # ----------------------------------------------------------------------------- graf i statystyki
 
-@app.get("/graph", tags=["graf"], summary="Graf powiązań: węzły i krawędzie (Cytoscape / vis-network)")
+@app.get("/graph", tags=["graf"], summary="Graf powiązań: węzły i krawędzie")
 def graph(campaign_id: Optional[int] = None, operator: Optional[int] = None, material_id: Optional[str] = None,
           entities: bool = True, shared_only: bool = True, min_score: float = 0.5) -> dict[str, Any]:
     """Cały graf albo wycinek: `campaign_id` (jedna kampania), `operator` (kampanie operatora),

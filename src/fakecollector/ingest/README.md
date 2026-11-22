@@ -37,7 +37,7 @@ inc = ingest("data/DANE/47", fetch=False)
 inc.for_module("image")      # zrzuty, obrazy z *_files, klatki z wideo
 inc.for_module("av")         # wideo i wyciągnięty dźwięk (WAV 16 kHz mono)
 inc.text, inc.text_origin    # wejście dla modułu tekstu: text.extract(inc)
-osint_rec = run_osint(inc)   # moduł OSINT kolegów (modules/osint)
+osint_rec = run_osint(inc)   # moduł OSINT (features/osint)
 ```
 
 ## Co trafia do którego modułu

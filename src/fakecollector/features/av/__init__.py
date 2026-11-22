@@ -811,6 +811,3 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Zapisano {len(records)} materiałów do {a.json}")
     return 0
 
-
-if __name__ == "__main__":
-    raise SystemExit(main())

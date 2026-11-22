@@ -12,16 +12,19 @@ wejście ─► preprocessing ─► moduły cech ─► rekord materiału ─�
 | Etap | Kod | Co robi |
 |---|---|---|
 | Preprocessing | `src/fakecollector/ingest/` | rozpoznaje wejście, otwiera link **w kontenerze** (Chromium), rozkłada materiał na części dla modułów (tekst, HAR/HTML, obrazy, nagrania), wykrywa duplikaty |
-| Moduł tekstu | `src/fakecollector/features/text.py` | osoby, marki, kwoty, perswazja, szkielet tekstu, odciski: sha256, MinHash, embeddingi |
-| Moduł OSINT | `modules/osint/` | domeny, przekierowania, piksele i konta reklamowe, kit, serwery, DNS/WHOIS/TLS → pivoty |
+| Moduł tekstu | `src/fakecollector/features/text/` | osoby, marki, kwoty, perswazja, szkielet tekstu, odciski: sha256, MinHash, embeddingi |
+| Moduł OSINT | `src/fakecollector/features/osint/` | domeny, przekierowania, piksele i konta reklamowe, kit, serwery, DNS/WHOIS/TLS → pivoty |
 | Moduł obrazu | `src/fakecollector/features/image/` | hashe percepcyjne, CLIP, twarze (ArcFace), logo, QR |
-| Moduł audio i wideo | `src/fakecollector/features/av.py` | transkrypcja (Whisper), odcisk głosu (ECAPA), odciski dźwięku i obrazu filmu, napisy z ekranu |
+| Moduł audio i wideo | `src/fakecollector/features/av/` | transkrypcja (Whisper), odcisk głosu (ECAPA), odciski dźwięku i obrazu filmu, napisy z ekranu |
 | Rekord materiału | `src/fakecollector/record/` | wszystkie moduły → jeden rekord → Postgres (pgvector) → wyszukiwanie podobnych |
 | Grupowanie | `src/fakecollector/grouping/` | porównanie par modułami, kampanie i operatorzy, przesłanki |
 | Graf | `src/fakecollector/graph/` | graf powiązań dla frontu (`/graph`) i kopia w Neo4j |
+| Skaner Biblioteki Reklam | `src/fakecollector/adlib/` | skan reklam Meta co 3 h, filtr wstępny, tropy kampanii, wysyłka podejrzanych do `/analyze` (usługa `scheduler`) |
 | Ewaluacja | `src/fakecollector/eval/` | jakość grupowania względem etykiet: pary (precyzja, czułość, F1), ARI, przypisywanie nowych materiałów, ablacja modułów, dobór progu |
 | API | `src/fakecollector/api/main.py` | FastAPI, dokumentacja: http://localhost:8000/docs |
-| Front | `front/` | React (Vite), http://localhost:5173 |
+| Front | `front/` | React (Vite), http://localhost:5173 – opis w `front/README.md` |
+
+Każdy moduł ma opis w swoim folderze (`README.md`), np. `src/fakecollector/features/text/README.md`.
 
 ## Usługi
 
@@ -41,7 +44,7 @@ cp .env.example .env                      # Windows: copy .env.example .env
 docker login                              # zalecane: Docker Hub bez logowania ma limit pobrań (błąd 429)
 docker compose build app                  # pierwszy build 15–30 min
 docker compose up -d
-docker compose exec app python scripts/pobierz_modele_obrazu.py --modele siglip2,clip,buffalo_l,yunet_sface,magface,facetorch
+docker compose exec app python scripts/image/pobierz_modele_obrazu.py --modele siglip2,clip,buffalo_l,yunet_sface,magface,facetorch
 docker compose exec app python scripts/smoke_test.py      # 23 testy, ok. 5 min
 ```
 
@@ -86,7 +89,7 @@ npm run dev                               # http://localhost:5173 (adres API: VI
 | `GET /campaigns`, `GET /campaigns/{id}` | kampanie; szczegóły z materiałami, powiązaniami i kampaniami tego samego operatora |
 | `GET /materials/{id}`, `GET /materials/{id}/images` | rekord materiału (bez wektorów), zrzuty i klatki |
 | `POST /materials/{id}/decision` | decyzja analityka: `potwierdz` / `odrzuc` / `cofnij` |
-| `GET /graph` (`?campaign_id=`, `?operator=`, `?material_id=`) | graf `{nodes, edges, stats, legend}` dla Cytoscape / vis-network / react-force-graph |
+| `GET /graph` (`?campaign_id=`, `?operator=`, `?material_id=`) | graf `{nodes, edges, stats, legend}` (front rysuje go przez react-force-graph) |
 | `GET /compare?a=&b=` | porównanie dwóch materiałów wszystkimi modułami |
 | `GET /adlib/status`, `GET /adlib/ads` | stan skanera Biblioteki Reklam i znalezione reklamy |
 | `POST /text/analyze`, `/image/analyze`, `/image/compare`, `/av/compare` | pojedyncze moduły (do testów) |
@@ -97,7 +100,7 @@ Operacje administracyjne są w wierszu poleceń (kontener `app`, `api` albo `sch
 python -m fakecollector.grouping rebuild          # przeliczenie kampanii dla całej bazy
 python -m fakecollector.graph sync                # kopia grafu w Neo4j
 python -m fakecollector.eval run | show           # ewaluacja jakości grupowania
-python -m fakecollector.worker --raz | --ponow    # skan Biblioteki Reklam teraz / ponowna analiza reklam bez rekordu
+python -m fakecollector.adlib --raz | --ponow    # skan Biblioteki Reklam teraz / ponowna analiza reklam bez rekordu
 python -m fakecollector.record delete <id>        # usunięcie materiału
 ```
 
@@ -171,7 +174,7 @@ docker compose down           # stop (dane zostają)
 docker compose logs -f api    # logi API
 ```
 
-- Kod jest zamontowany w kontenerach (`src/`, `modules/`, `config/`), API przeładowuje się samo – po zmianie
+- Kod jest zamontowany w kontenerach (`src/`, `config/`), API przeładowuje się samo – po zmianie
   kodu nie trzeba builda. Build tylko po zmianie `requirements.txt`, `constraints.txt` lub `Dockerfile`.
 - Biblioteka doinstalowana ręcznie (`docker compose exec app pip install …`) znika przy odtworzeniu kontenera.
 - Po merge'u cudzego kodu: `python scripts/smoke_test.py`.
@@ -181,7 +184,7 @@ docker compose logs -f api    # logi API
 - **`429 Too Many Requests` przy buildzie** → `docker login` (limit Docker Hub dla niezalogowanych).
 - **`Form data requires "python-multipart"`** albo brak `open_clip_torch` 2.32 → obraz sprzed zmian w
   `requirements.txt`: `docker compose build app` (albo doraźnie `pip install` w kontenerach `app` i `api`).
-- **Moduł obrazu bez wektorów CLIP** → nie pobrano modeli: `python scripts/pobierz_modele_obrazu.py …`.
+- **Moduł obrazu bez wektorów CLIP** → nie pobrano modeli: `python scripts/image/pobierz_modele_obrazu.py …`.
 - **Materiał z 0 słów tekstu** → brak pliku HTML (Windows Defender) – rozpakuj paczkę ponownie przez 7-Zip.
 - **Port zajęty** → zmień porty w `.env`.
 - ⚠️ Linków ze scamów nie otwieraj w swojej przeglądarce – system otwiera je tylko w kontenerze.

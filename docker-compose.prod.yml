@@ -52,14 +52,13 @@ services:
       NEO4J_USER: ${NEO4J_USER:-neo4j}
       NEO4J_PASSWORD: ${NEO4J_PASSWORD}
       CORS_ORIGINS: https://${DOMAIN:?ustaw DOMAIN w .env}
-      PYTHONPATH: /workspace/src:/workspace/modules
+      PYTHONPATH: /workspace/src
       STORE_DIR: /workspace/data/store
       META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
       ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
       ADLIB_ANALYZE_URL: http://localhost:8000/analyze
     volumes:
       - ./src:/workspace/src
-      - ./modules:/workspace/modules
       - ./scripts:/workspace/scripts
       - ./config:/workspace/config
       - ./data:/workspace/data
@@ -74,16 +73,15 @@ services:
         condition: service_healthy
       api:
         condition: service_started
-    command: python -m fakecollector.worker
+    command: python -m fakecollector.adlib
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-fakecollector}
-      PYTHONPATH: /workspace/src:/workspace/modules
+      PYTHONPATH: /workspace/src
       META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
       ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
       ADLIB_ANALYZE_URL: http://api:8000/analyze
     volumes:
       - ./src:/workspace/src
-      - ./modules:/workspace/modules
       - ./data:/workspace/data
       - ./config:/workspace/config
 

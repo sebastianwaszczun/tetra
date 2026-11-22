@@ -3,7 +3,7 @@ insightface==0.7.3          # ArcFace embeddingi (512-d), detekcja twarzy
 onnxruntime>=1.17           # backend dla insightface (CPU)
 facetorch==0.6.2             # deepfake i emocje, zgodne z torch 2.3.1
 opencv-python-headless
-# MagFace nie ma pakietu pip – wagi pobiera scripts/pobierz_modele_obrazu.py
+# MagFace nie ma pakietu pip – wagi pobiera scripts/image/pobierz_modele_obrazu.py
 
 # --- Obraz i szablon ---
 ImageHash                   # perceptual hash (pHash/dHash) – duplikaty kreacji

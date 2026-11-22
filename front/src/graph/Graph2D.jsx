@@ -3,9 +3,9 @@ import ForceGraph2D from 'react-force-graph-2d'
 import rough from 'roughjs'
 import { forceCollide } from 'd3-force'
 
-import { canvasImageUrl, getJSON } from './api.js'
-import { PAIR_EDGES, asSelection, gravity, prepareGraph } from './graphData.js'
-import { Box } from './ui.jsx'
+import { Box } from '../components/ui.jsx'
+import { PAIR_EDGES, asSelection, gravity, idOf, materialIdOf, prepareGraph, shorten } from './prepare.js'
+import { loadThumb } from './thumbs.js'
 
 const INK = '#161412'
 const PAPER = '#F3EBDC'
@@ -38,7 +38,6 @@ const EDGE_STYLE = {
 
 const STRONG = new Set(['material', 'campaign', 'operator'])
 export const radius = (n) => (NODE_STYLE[n.type]?.r ?? 9) * (n.count > 1 ? 1 + 0.32 * Math.log2(n.count) : 1)
-const idOf = (x) => (typeof x === 'object' ? x.id : x)
 
 function hash(s) {
   let h = 2166136261
@@ -50,8 +49,6 @@ function rgba(hex, a) {
   const n = parseInt(hex.slice(1), 16)
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`
 }
-
-const shorten = (s, n) => (s.length > n ? s.slice(0, n - 1) + '…' : s)
 
 // ---------------------------------------------------------------- kształty Rough.js (liczone raz, rysowane co klatkę)
 
@@ -95,32 +92,18 @@ function ring(r, color, dash, seed) {
 // ---------------------------------------------------------------- miniatury zrzutów materiałów
 
 function useThumbs(nodes, max = 40) {
-  const [tick, setTick] = useState(0)
-  const cache = useRef(new Map())
-  const ids = nodes.filter((n) => n.type === 'material').slice(0, max)
-    .map((n) => n.meta.material_id ?? n.id.replace(/^material:/, ''))
-  const key = ids.join(',')
-  const mounted = useRef(true)
+  const [images, setImages] = useState(() => new Map())
+  const key = nodes.filter((n) => n.type === 'material').slice(0, max).map(materialIdOf).join(',')
   useEffect(() => {
-    mounted.current = true
-    return () => { mounted.current = false }
-  }, [])
-  useEffect(() => {
-    for (const id of ids) {
-      if (cache.current.has(id)) continue
-      cache.current.set(id, null)       // pobieranie w toku – nie pytamy drugi raz
-      getJSON(`/materials/${encodeURIComponent(id)}/images`).then((d) => {
-        const items = d?.items ?? []
-        const pick = items.find((i) => i.kind === 'screenshot') ?? items.find((i) => i.kind === 'image') ?? items[0]
-        if (!pick) return
-        const img = new Image()
-        img.crossOrigin = 'anonymous'
-        img.onload = () => { cache.current.set(id, img); if (mounted.current) setTick((t) => t + 1) }
-        img.src = canvasImageUrl(id, pick.n)
-      }).catch(() => cache.current.delete(id))
+    let alive = true
+    for (const id of key ? key.split(',') : []) {
+      loadThumb(id).then((img) => {
+        if (img && alive) setImages((m) => (m.get(id) === img ? m : new Map(m).set(id, img)))
+      })
     }
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
-  return [cache.current, tick]
+    return () => { alive = false }
+  }, [key])
+  return images
 }
 
 // ---------------------------------------------------------------- legenda
@@ -169,7 +152,7 @@ export function Legend({ nodes, links }) {
 
 // ---------------------------------------------------------------- graf 2D
 
-export default function Graph({ data, onSelect, hideTypes = [], focusId = null, height = 560 }) {
+export default function Graph2D({ data, onSelect, hideTypes = [], focusId = null, height = 560 }) {
   const wrap = useRef(null)
   const fg = useRef(null)
   const fitted = useRef(false)
@@ -178,7 +161,7 @@ export default function Graph({ data, onSelect, hideTypes = [], focusId = null, 
   const [active, setActive] = useState(null)       // { node } albo { link }
 
   const graph = useMemo(() => prepareGraph(data, { hideTypes }), [data, hideTypes.join()]) // eslint-disable-line react-hooks/exhaustive-deps
-  const [thumbs, thumbTick] = useThumbs(graph.nodes)
+  const thumbs = useThumbs(graph.nodes)
 
   const neighbors = useMemo(() => {
     const m = new Map(graph.nodes.map((n) => [n.id, new Set([n.id])]))
@@ -228,7 +211,7 @@ export default function Graph({ data, onSelect, hideTypes = [], focusId = null, 
     rc.draw(shape(node.type, r, seed))
 
     if (node.type === 'material') {
-      const img = thumbs.get(node.meta.material_id ?? node.id.replace(/^material:/, ''))
+      const img = thumbs.get(materialIdOf(node))
       if (img) {
         const side = Math.min(img.width, img.height)
         ctx.save()
@@ -275,7 +258,7 @@ export default function Graph({ data, onSelect, hideTypes = [], focusId = null, 
       ctx.fillText(text, 0, y)
     }
     ctx.restore()
-  }, [lit, thumbs, thumbTick, focusId, active]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [lit, thumbs, focusId, active])
 
   const linkLit = useCallback((l) => !lit || (lit.has(idOf(l.source)) && lit.has(idOf(l.target))), [lit])
 

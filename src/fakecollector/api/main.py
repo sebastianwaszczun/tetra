@@ -11,8 +11,9 @@ import os
 import threading
 from typing import Any, Literal, Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from fakecollector.features import av as av_module
@@ -322,9 +323,72 @@ def material_candidates(material_id: str, limit: int = 20) -> dict[str, Any]:
 
 @app.delete("/materials/{material_id}", tags=["rekord materiału"], summary="Usunięcie materiału z bazy")
 def material_delete(material_id: str) -> dict[str, Any]:
-    if not record_module.delete_material(material_id):
+    summary = record_module.load_summary(material_id)
+    if summary is None or not record_module.delete_material(material_id):
         raise HTTPException(404, "Nie ma takiego materiału.")
+    if summary.get("campaign_id") is not None:      # pusta kampania znika, pozostałym odświeża się opis
+        from fakecollector.grouping.campaigns import refresh_campaign, refresh_operators
+        refresh_campaign(summary["campaign_id"])
+        refresh_operators()
     return {"deleted": material_id}
+
+
+IMAGE_KINDS = {"screenshot": "zrzut", "image": "obraz ze strony", "frame": "klatka filmu"}
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp", ".avif"}
+
+
+def _material_images(material_id: str) -> list[dict[str, Any]]:
+    from pathlib import Path
+    rec = record_module.load_record(material_id)
+    if rec is None:
+        raise HTTPException(404, "Nie ma takiego materiału.")
+    out = []
+    for n, a in enumerate((rec.summary.get("incident") or {}).get("artifacts") or []):
+        path = a.get("path")
+        if a.get("kind") in IMAGE_KINDS and path and Path(path).suffix.lower() in IMAGE_SUFFIXES:
+            video = (a.get("meta") or {}).get("video")
+            out.append({"n": n, "kind": a["kind"], "label": IMAGE_KINDS[a["kind"]], "name": Path(path).name,
+                        "source": a.get("source"), "video": Path(video).name if video else None, "_path": path})
+    return out
+
+
+@app.get("/materials/{material_id}/images", tags=["rekord materiału"],
+         summary="Zrzuty, obrazy ze strony i klatki filmów materiału")
+def material_images(material_id: str) -> dict[str, Any]:
+    items = [{k: v for k, v in i.items() if k != "_path"} for i in _material_images(material_id)]
+    return {"material_id": material_id, "count": len(items), "items": items}
+
+
+@app.get("/materials/{material_id}/images/{n}", tags=["rekord materiału"], summary="Plik obrazu materiału")
+def material_image(material_id: str, n: int) -> FileResponse:
+    from pathlib import Path
+    item = next((i for i in _material_images(material_id) if i["n"] == n), None)
+    if item is None:
+        raise HTTPException(404, "Nie ma takiego obrazu.")
+    path = Path(item["_path"]).resolve()
+    data_root = Path(os.environ.get("DATA_DIR", "data")).resolve()
+    if not path.is_relative_to(data_root) or not path.is_file():
+        raise HTTPException(404, "Plik obrazu niedostępny.")
+    return FileResponse(path, headers={"Cache-Control": "private, max-age=86400"})
+
+
+class DecisionRequest(BaseModel):
+    decision: Literal["potwierdz", "odrzuc", "cofnij"] = Field(
+        description="potwierdz – materiał należy do kampanii; odrzuc – nie należy (dostaje własną kampanię); "
+                    "cofnij – usuń decyzję i przypisz materiał od nowa.")
+    note: str = Field("", description="Notatka analityka (opcjonalnie).")
+
+
+@app.post("/materials/{material_id}/decision", tags=["kampanie"], summary="Decyzja analityka o przynależności")
+def material_decision(material_id: str, req: DecisionRequest = Body(...)) -> dict[str, Any]:
+    """Decyzja dotyczy par materiałów, więc przetrwa przeliczenie kampanii (`/campaigns/rebuild`)."""
+    from fakecollector.grouping.decisions import DecisionError, decide
+    try:
+        return decide(material_id, req.decision, req.note)
+    except KeyError:
+        raise HTTPException(404, "Nie ma takiego materiału.") from None
+    except DecisionError as exc:
+        raise HTTPException(409, str(exc)) from exc
 
 
 # ----------------------------------------------------------------------------- kampanie

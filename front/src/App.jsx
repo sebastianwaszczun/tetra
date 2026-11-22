@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useRef, useState } from 'react'
 
 import sit0 from './assets/cat/sit-0.webp'
 import sit1 from './assets/cat/sit-1.webp'
@@ -9,9 +9,19 @@ import sit5 from './assets/cat/sit-5.webp'
 import catJump from './assets/cat/jump.webp'
 import catHang from './assets/cat/hang.webp'
 
+import { API_URL } from './api.js'
+import Result from './Result.jsx'
+import { href, useRoute } from './route.js'
+import { Loading } from './ui.jsx'
+
+const page = (name) => lazy(() => import('./pages.jsx').then((m) => ({ default: m[name] })))
+const CampaignsPage = page('CampaignsPage')
+const CampaignPage = page('CampaignPage')
+const OperatorPage = page('OperatorPage')
+const MaterialPage = page('MaterialPage')
+
 const SIT_FRAMES = [sit0, sit1, sit2, sit3, sit4, sit5]
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 const IMAGE_EXT = /\.(png|jpe?g|webp|gif|bmp|avif)$/i
 const isImage = (f) => f.type.startsWith('image/') || IMAGE_EXT.test(f.name)
 const fileKey = (f) => `${f.name}|${f.size}|${f.lastModified}`
@@ -28,7 +38,10 @@ const STEPS = [
   'Spisuję raport…',
 ]
 
-const NAV = ['PRZEGLAD KAMPANII']
+const NAV = [
+  { label: 'SPRAWDŹ', href: href.home, views: ['home'] },
+  { label: 'PRZEGLĄD KAMPANII', href: href.campaigns, views: ['campaigns', 'campaign', 'operator', 'material'] },
+]
 
 const CARDS = [
   {
@@ -115,9 +128,9 @@ function SvgDefs() {
   )
 }
 
-function NavLink({ children, href = '#' }) {
+function NavLink({ children, href = '#', active = false }) {
   return (
-    <a className="nl" href={href}>
+    <a className={'nl' + (active ? ' active' : '')} href={href} aria-current={active ? 'page' : undefined}>
       <span className="nh" aria-hidden="true" />
       {children}
       <span className="ink" aria-hidden="true" />
@@ -142,6 +155,8 @@ function DashedLine() {
 }
 
 export default function App() {
+  const route = useRoute()
+  const [outcome, setOutcome] = useState(null)
   const [q, setQ] = useState('')
   const [focused, setFocused] = useState(false)
   const [typing, setTyping] = useState(false)
@@ -190,6 +205,12 @@ export default function App() {
   }, [phase])
 
   useEffect(() => {
+    if (!outcome || phase !== 'open') return
+    setPhase('closing')
+    later('close', () => setPhase('idle'), 750)
+  }, [outcome, phase])
+
+  useEffect(() => {
     const img = files.find(isImage)
     if (!img) { setPreview(null); return }
     const url = URL.createObjectURL(img)
@@ -218,9 +239,12 @@ export default function App() {
     const ctrl = new AbortController()
     request.current = ctrl
     fetch(`${API_URL}/analyze`, { method: 'POST', body, signal: ctrl.signal })
-      .then((r) => r.json())
-      .then((data) => console.log('analyze', data))
-      .catch((err) => { if (err.name !== 'AbortError') console.error('analyze', err) })
+      .then((r) => r.json().catch(() => null).then((data) => {
+        if (!r.ok) throw new Error(data?.detail ? String(data.detail) : `Błąd ${r.status}`)
+        return data
+      }))
+      .then((data) => setOutcome({ data }))
+      .catch((err) => { if (err.name !== 'AbortError') setOutcome({ error: err }) })
   }
 
   const attach = (list) => {
@@ -268,6 +292,7 @@ export default function App() {
     if (phase !== 'idle') return
     const text = q.trim()
     if (!text && !files.length) { inputRef.current?.focus(); return }
+    setOutcome(null)
     send(text, files)
     document.activeElement?.blur?.()
     setPhase('jump')
@@ -287,6 +312,12 @@ export default function App() {
     later('close', () => setPhase('idle'), 750)
   }
 
+  const reset = () => {
+    setOutcome(null)
+    setQ('')
+    clearFiles()
+  }
+
   const onType = (e) => {
     if (!idle) return
     setQ(e.target.value)
@@ -302,14 +333,25 @@ export default function App() {
       </svg>
 
       <header className="header">
-        <a className="logo" href="#">TETRA</a>
+        <a className="logo" href={href.home}>TETRA</a>
         <nav className="nav" aria-label="Główna">
-          {NAV.map((label) => <NavLink key={label}>{label}</NavLink>)}
+          {NAV.map((n) => <NavLink key={n.label} href={n.href} active={n.views.includes(route.view)}>{n.label}</NavLink>)}
         </nav>
         <RoughLine d="M0 4 C300 6 600 1 1000 4" />
       </header>
 
-      <main className={'main' + (idle ? '' : ' deep')}>
+      {route.view !== 'home' && (
+        <main className="main view-main">
+          <Suspense fallback={<Loading text="Otwieram kartotekę…" />}>
+            {route.view === 'campaigns' && <CampaignsPage />}
+            {route.view === 'campaign' && <CampaignPage id={route.id} key={route.id} />}
+            {route.view === 'operator' && <OperatorPage id={route.id} key={route.id} />}
+            {route.view === 'material' && <MaterialPage id={route.id} key={route.id} />}
+          </Suspense>
+        </main>
+      )}
+
+      {route.view === 'home' && <main className={'main' + (idle ? '' : ' deep')}>
         <div className="title-wrap">
           <h1 className="title">
             <span className="title-1">
@@ -431,7 +473,13 @@ export default function App() {
             <img className="h" src={catHang} alt="" />
           </div>
 
-          <div className={'cards' + (idle ? '' : ' hide')}>
+          {outcome && idle && (
+            <div className="result-wrap">
+              <Result data={outcome.data} error={outcome.error} onReset={reset} />
+            </div>
+          )}
+
+          {!outcome && <div className={'cards' + (idle ? '' : ' hide')}>
             {CARDS.map((c) => (
               <button
                 className="card"
@@ -449,9 +497,9 @@ export default function App() {
                 <span className="ink" aria-hidden="true" />
               </button>
             ))}
-          </div>
+          </div>}
         </div>
-      </main>
+      </main>}
 
       <footer className="footer">
         <RoughLine d="M0 4 C250 2 520 7 1000 3" />

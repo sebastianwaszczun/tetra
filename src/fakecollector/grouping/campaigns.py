@@ -16,10 +16,11 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from collections import Counter, defaultdict
 from typing import Any
 
-from .compare import ASSIGN, REVIEW, Context, PairResult, compare_materials, load_context
+from .compare import ASSIGN, MODULES, REVIEW, Context, PairResult, compare_materials, load_context
 
 log = logging.getLogger(__name__)
 
@@ -56,11 +57,25 @@ ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS last_seen TIMESTAMPTZ;
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS operator_group BIGINT;      -- kampanie tego samego operatora
 ALTER TABLE material_links ADD COLUMN IF NOT EXISTS operator_score REAL NOT NULL DEFAULT 0;
 ALTER TABLE material_links ADD COLUMN IF NOT EXISTS operator_reasons JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+CREATE TABLE IF NOT EXISTS material_decisions (
+    a            TEXT NOT NULL REFERENCES materials (id) ON DELETE CASCADE,
+    b            TEXT NOT NULL REFERENCES materials (id) ON DELETE CASCADE,
+    decision     TEXT NOT NULL,                  -- potwierdzone / odrzucone
+    note         TEXT,
+    decided_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (a, b),
+    CHECK (a < b)
+);
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS decision TEXT;              -- potwierdzony / odrzucony
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS decision_note TEXT;
+ALTER TABLE materials ADD COLUMN IF NOT EXISTS decided_at TIMESTAMPTZ;
 """
 METHOD = "fakecollector-grupowanie-v1"
 CANDIDATES_PER_MATERIAL = 25
 
 _ready = False
+_ready_lock = threading.Lock()
 
 
 def connect():
@@ -74,8 +89,11 @@ def connect():
         global _ready
         with record_connect() as conn:
             if not _ready:
-                conn.execute(SCHEMA_SQL)
-                _ready = True
+                from fakecollector.record.store import ensure_schema
+                with _ready_lock:
+                    if not _ready:
+                        ensure_schema(conn, SCHEMA_SQL, 7302)
+                        _ready = True
             yield conn
     return _cm()
 
@@ -182,7 +200,8 @@ def refresh_campaign(campaign_id: int) -> None:
         n_review = sum(1 for r in rows if r[8] == "do_weryfikacji")
         summary = (f"{len(rows)} materiałów ({n_review} do weryfikacji), {len(dom_list)} domen"
                    + (f", osoby: {', '.join(p for p, _ in persons.most_common(3))}" if persons else "")
-                   + (f". Łączą je: {', '.join(n for n, _ in signals.most_common())}" if signals else ""))
+                   + (f". Łączą je: {', '.join(MODULES.get(n, {}).get('label', n) for n, _ in signals.most_common())}"
+                      if signals else ""))
         dates = [r[7] for r in rows if r[7]]
         conn.execute(
             """UPDATE campaigns SET label=%s, summary=%s, size=%s, persons=%s, domains=%s, brands=%s,
@@ -195,7 +214,9 @@ def refresh_campaign(campaign_id: int) -> None:
 
 def assign_material(material_id: str) -> dict[str, Any]:
     """Przypisanie nowego materiału do kampanii (porównanie z kandydatami z bazy)."""
-    results = compare_with_candidates(material_id)
+    from .decisions import load_pairs
+    _, rejected = load_pairs()
+    results = [r for r in compare_with_candidates(material_id) if tuple(sorted((r.a, r.b))) not in rejected]
     strong = [r for r in results if r.score >= ASSIGN]
     with connect() as conn, conn.transaction():
         others = [r.b for r in results]
@@ -277,8 +298,13 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
             parent[x] = parent[parent[x]]
             x = parent[x]
         return x
+    from .decisions import load_pairs
+    confirmed, rejected = load_pairs()
     for (a, b), r in edges.items():
-        if r.score >= ASSIGN:
+        if r.score >= ASSIGN and (a, b) not in rejected:
+            parent[find(a)] = find(b)
+    for a, b in confirmed:                       # decyzja analityka: para zawsze w jednej kampanii
+        if a in parent and b in parent:
             parent[find(a)] = find(b)
     for d, orig in dups.items():                 # duplikat zawsze w kampanii oryginału
         if d in parent and orig in parent:
@@ -292,6 +318,8 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
     review: dict[str, tuple[str, float]] = {}     # pojedynczy materiał -> (sąsiad w kampanii, wynik)
     member_of = {m: tuple(sorted(g)) for g in clusters for m in g}
     for (a, b), r in edges.items():
+        if (a, b) in rejected:
+            continue
         for x, y in ((a, b), (b, a)):
             if x in singles and y in member_of and REVIEW <= r.score < ASSIGN:
                 if x not in review or r.score > review[x][1]:
@@ -360,6 +388,8 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
                 cid = stable_id([m])
                 _set(conn, [m], cid, "nowy_wzorzec", None)
             touched.add(cid)
+        from .decisions import apply_labels
+        apply_labels(conn)
         # kampanie, które straciły wszystkie materiały
         conn.execute("""DELETE FROM campaigns c WHERE method = %s
                         AND NOT EXISTS (SELECT 1 FROM materials m WHERE m.campaign_id = c.id)""", (METHOD,))
@@ -431,12 +461,15 @@ def get_campaign(campaign_id: int, with_members: bool = True) -> dict[str, Any] 
         out = _camp_row(row)
         if with_members:
             members = conn.execute(
-                """SELECT id, source, title, domain, status, assignment, assignment_score, persons, created_at
+                """SELECT id, source, title, domain, status, assignment, assignment_score, persons, created_at,
+                          decision, decision_note, decided_at
                    FROM materials WHERE campaign_id = %s ORDER BY assignment, created_at""",
                 (campaign_id,)).fetchall()
             out["members"] = [{"id": m[0], "source": m[1], "title": m[2], "domain": m[3], "status": m[4],
                                "assignment": m[5], "score": m[6], "persons": m[7],
-                               "created_at": m[8].isoformat() if m[8] else None} for m in members]
+                               "created_at": m[8].isoformat() if m[8] else None,
+                               "decision": m[9], "decision_note": m[10],
+                               "decided_at": m[11].isoformat() if m[11] else None} for m in members]
             ids = [m[0] for m in members]
             links = conn.execute(
                 """SELECT a, b, score, decision, reasons FROM material_links

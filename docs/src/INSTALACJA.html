@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>Instalacja i uruchomienie</title>
+<link rel="stylesheet" href="style.css">
+<style>@page { @bottom-left { content: "TETRA · Instalacja i uruchomienie"; } }</style>
+</head><body>
+
+<div class="cover">
+  <img class="cat" src="img/kot.png" alt="">
+  <p class="brand">TETRA</p>
+  <p class="sub">FAKE-TRACE</p>
+  <h1 class="title">Instalacja i uruchomienie</h1>
+  <p class="lead">jedna komenda lokalnie, demo online, wdrożenie na serwer</p>
+  <div class="toc">
+    <div class="label">Spis treści</div>
+    <ol>
+      <li><b>01</b>Demo online</li><li><b>02</b>Wymagania</li><li><b>03</b>Uruchomienie – jedna komenda</li>
+      <li><b>04</b>Usługi i adresy</li><li><b>05</b>Dane</li><li><b>06</b>Konfiguracja</li>
+      <li><b>07</b>Sprawdzenie działania</li><li><b>08</b>Wdrożenie na serwer i CI/CD</li>
+      <li><b>09</b>Front w trybie deweloperskim</li><li><b>10</b>Problemy</li>
+    </ol>
+  </div>
+  <div class="meta"><span><b>HackNation 2026</b> · wyzwanie NASK „Follow the fake”</span><span>Dokumentacja projektu · 22.11.2026</span></div>
+</div>
+
+<section>
+<p class="kicker"><b>01</b> / Demo online</p>
+<h2>Działa bez instalacji: <span class="red">tetracore.pl</span></h2>
+<div class="stats" style="--n:3">
+  <div class="stat"><b>tetracore.pl</b><span>GUI: analiza materiału, kampanie, grafy, operatorzy</span></div>
+  <div class="stat"><b>/api/docs</b><span>dokumentacja API (OpenAPI): <code>https://tetracore.pl/api/docs</code></span></div>
+  <div class="stat"><b>co 3 h</b><span>na serwerze działa też skaner Biblioteki Reklam Meta</span></div>
+</div>
+<p>Sprawdzenie działania podczas oceny nie wymaga żadnego klucza ani konta. Wersja online to ten sam kod co w repozytorium (<code>docker-compose.prod.yml</code>, sekcja 08).</p>
+</section>
+
+<section>
+<p class="kicker"><b>02</b> / Wymagania</p>
+<h2>Wystarczy Docker</h2>
+<table>
+  <thead><tr><th style="width:22%"></th><th>Minimum</th><th style="width:30%">Zalecane</th></tr></thead>
+  <tbody>
+    <tr><td>system</td><td>Windows 10/11 z Docker Desktop (backend WSL2), macOS z Docker Desktop, Linux z Docker Engine</td><td>–</td></tr>
+    <tr><td>Docker Compose</td><td>2.20 lub nowszy (<code>docker compose version</code>)</td><td>najnowszy</td></tr>
+    <tr><td>RAM dla Dockera</td><td>8 GB</td><td>12–16 GB (Docker Desktop → Settings → Resources)</td></tr>
+    <tr><td>miejsce na dysku</td><td>25 GB</td><td>35 GB</td></tr>
+    <tr><td>internet</td><td>przy pierwszym starcie (obrazy, pakiety, modele ok. 3 GB)</td><td>–</td></tr>
+    <tr><td>GPU</td><td>niepotrzebne – wszystko działa na CPU</td><td>NVIDIA + <code>docker-compose.gpu.yml</code> (tylko Linux/WSL2)</td></tr>
+  </tbody>
+</table>
+<p>Nie trzeba instalować Pythona, Node.js ani bazy danych – wszystko działa w kontenerach. Pełna lista bibliotek, modeli i usług z licencjami: <b>LICENCJE.pdf</b>.</p>
+</section>
+
+<section>
+<p class="kicker"><b>03</b> / Uruchomienie</p>
+<h2>Jedna komenda</h2>
+<pre><code>git clone &lt;adres repozytorium&gt; tetra
+cd tetra
+docker compose up -d</code></pre>
+<p>Po zakończeniu otwórz <strong>http://localhost:8080</strong>. Plik <code>.env</code> nie jest potrzebny – wszystkie ustawienia mają wartości domyślne (sekcja 06).</p>
+<h3>Co się dzieje przy pierwszym starcie</h3>
+<table>
+  <thead><tr><th>Etap</th><th style="width:20%">Usługa</th><th class="num" style="width:18%">Czas (orientacyjnie)</th></tr></thead>
+  <tbody>
+    <tr><td>pobranie obrazów Postgres, Neo4j, Caddy, Node</td><td>–</td><td class="num">1–3 min</td></tr>
+    <tr><td>budowa obrazu z modelami ML (PyTorch, InsightFace, Playwright…)</td><td><code>app</code></td><td class="num">15–30 min</td></tr>
+    <tr><td>budowa frontu</td><td><code>web</code></td><td class="num">1–2 min</td></tr>
+    <tr><td>schemat bazy, pobranie modeli (obraz, tekst, audio), baza twarzy</td><td><code>init</code></td><td class="num">5–15 min</td></tr>
+    <tr><td>start API, frontu, skanera</td><td><code>api</code>, <code>web</code>, <code>scheduler</code></td><td class="num">&lt; 1 min</td></tr>
+    <tr><td>opcjonalnie: wczytanie paczki z <code>data/BACKUP</code> i <code>data/DANE</code></td><td><code>seed</code> (w tle)</td><td class="num">15–25 min</td></tr>
+  </tbody>
+</table>
+<p><code>docker compose up -d</code> czeka, aż <code>init</code> pobierze modele, i dopiero wtedy uruchamia API – przy pierwszym starcie komenda może pracować kilkanaście minut. Postęp:</p>
+<pre><code>docker compose logs -f init     <span class="c"># modele</span>
+docker compose logs -f seed     <span class="c"># wczytywanie paczki (jeśli jest w data/)</span>
+docker compose ps               <span class="c"># stan usług; init i seed kończą się statusem „Exited (0)”</span></code></pre>
+<p>Każdy kolejny start trwa kilkanaście sekund – modele są w wolumenie <code>models</code>, obraz w cache Dockera, a <code>init</code> i <code>seed</code> niczego nie liczą od nowa.</p>
+</section>
+
+<section>
+<p class="kicker"><b>04</b> / Usługi i adresy</p>
+<h2>Co startuje <span class="red">i w jakiej kolejności</span></h2>
+<figure><img src="img/uslugi.png" alt="Kolejność startu usług: postgres i neo4j, init, api, web i scheduler, seed, app"></figure>
+<table>
+  <thead><tr><th style="width:15%">Usługa</th><th>Rola</th><th style="width:24%">Działa</th></tr></thead>
+  <tbody>
+    <tr><td>postgres</td><td>PostgreSQL 16 + pgvector – materiały, cechy, wektory, kampanie, reklamy ze skanera</td><td>stale</td></tr>
+    <tr><td>neo4j</td><td>kopia grafu powiązań do przeglądania</td><td>stale</td></tr>
+    <tr><td>init</td><td>schemat bazy, pobranie modeli, baza twarzy</td><td>jednorazowo przy każdym starcie</td></tr>
+    <tr><td>api</td><td>FastAPI – analiza materiałów, kampanie, graf</td><td>stale</td></tr>
+    <tr><td>web</td><td>front (React) serwowany przez Caddy; <code>/api/*</code> → <code>api</code></td><td>stale</td></tr>
+    <tr><td>seed</td><td>wczytanie materiałów z <code>data/</code>, gdy baza jest pusta</td><td>jednorazowo</td></tr>
+    <tr><td>scheduler</td><td>skaner Biblioteki Reklam Meta (co 3 h)</td><td>stale</td></tr>
+    <tr><td>app</td><td>ten sam obraz z JupyterLab – narzędzia wiersza poleceń</td><td>stale</td></tr>
+  </tbody>
+</table>
+<table>
+  <thead><tr><th style="width:32%">Co</th><th style="width:36%">Adres</th><th>Dane logowania</th></tr></thead>
+  <tbody>
+    <tr><td>front (GUI)</td><td>http://localhost:8080</td><td>–</td></tr>
+    <tr><td>API i dokumentacja</td><td>http://localhost:8000/docs</td><td>–</td></tr>
+    <tr><td>Neo4j Browser (kopia grafu)</td><td>http://localhost:7474</td><td><code>neo4j</code> / <code>fakecollector</code></td></tr>
+    <tr><td>JupyterLab (narzędzia zespołu)</td><td>http://localhost:8888</td><td>token <code>fake</code></td></tr>
+    <tr><td>PostgreSQL</td><td>localhost:5432</td><td><code>fake</code> / <code>fake</code>, baza <code>fakecollector</code></td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>05</b> / Dane</p>
+<h2>Paczka organizatora <span class="red">i baza osób</span></h2>
+<h3>Materiały z paczki (opcjonalnie)</h3>
+<p>Dane NASK nie są w repozytorium (regulamin zakazuje ich rozpowszechniania). Żeby od razu mieć kartotekę kampanii, rozpakuj paczkę do folderu <code>data/</code> tak, by powstały <code>data/BACKUP/p1…p15</code> i <code>data/DANE/1…61</code>, przed pierwszym <code>docker compose up -d</code>. Usługa <code>seed</code> wczyta je sama, gdy baza jest pusta.</p>
+<div class="note"><span class="hand">uwaga przy rozpakowaniu</span>
+<ul><li>Archiwum jest szyfrowane – użyj 7-Zip.</li>
+<li>Windows Defender i inne antywirusy usuwają zapisane strony scamów (pliki HTML). Dodaj folder projektu do wyjątków antywirusa przed rozpakowaniem, inaczej materiały będą bez tekstu.</li></ul></div>
+<p>Wczytanie później albo innego folderu (<code>record add</code> przyjmuje plik, folder przypadku albo folder z wieloma przypadkami):</p>
+<pre><code>docker compose exec api python -m fakecollector.record add data/MOJE_MATERIALY   <span class="c"># analiza i zapis</span>
+docker compose exec api python -m fakecollector.grouping rebuild                 <span class="c"># kampanie od nowa</span>
+docker compose exec api python -m fakecollector.graph sync                       <span class="c"># kopia grafu w Neo4j</span></code></pre>
+<h3>Baza referencyjna osób (opcjonalnie)</h3>
+<p>Pozwala nazwać osobę widoczną na zdjęciu. Zdjęć nie ma w repozytorium – mają różne licencje (LICENCJE.pdf).</p>
+<pre><code>data/reference_people/
+  rafal_brzoska/
+    01.jpg  02.png  …
+    zrodla.json     <span class="c"># {"osoba": "Rafał Brzoska", "zdjecia": [{"plik": "01.jpg", "url": "…", "autor": "…", "licencja": "CC BY 4.0"}]}</span></code></pre>
+<p><code>init</code> zbuduje wektory twarzy przy następnym starcie (albo od razu: <code>docker compose run --rm init</code>).</p>
+<h3>Czysta baza</h3>
+<pre><code>docker compose down
+docker volume rm fakecollector_pgdata fakecollector_neo4jdata   <span class="c"># modele zostają w fakecollector_models</span>
+docker compose up -d                                             <span class="c"># seed wczyta data/ od nowa</span></code></pre>
+<p><code>docker compose down -v</code> usuwa wszystkie wolumeny, także pobrane modele (ponowne pobieranie ok. 3 GB).</p>
+</section>
+
+<section>
+<p class="kicker"><b>06</b> / Konfiguracja</p>
+<h2>Plik <span class="red">.env</span> (opcjonalny)</h2>
+<p>Wzór: <code>.env.example</code> (Windows: <code>copy .env.example .env</code>).</p>
+<table>
+  <thead><tr><th style="width:36%">Zmienna</th><th style="width:20%">Domyślnie</th><th>Opis</th></tr></thead>
+  <tbody>
+    <tr><td>WEB_PORT, API_PORT</td><td>8080, 8000</td><td>porty frontu i API</td></tr>
+    <tr><td>POSTGRES_PORT, NEO4J_HTTP_PORT, NEO4J_BOLT_PORT, JUPYTER_PORT</td><td>5432, 7474, 7687, 8888</td><td>pozostałe porty – zmień, jeśli są zajęte</td></tr>
+    <tr><td>POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB</td><td>fake, fake, fakecollector</td><td>baza danych</td></tr>
+    <tr><td>NEO4J_USER, NEO4J_PASSWORD</td><td>neo4j, fakecollector</td><td>Neo4j</td></tr>
+    <tr><td>JUPYTER_TOKEN</td><td>fake</td><td>token JupyterLab</td></tr>
+    <tr><td>CORS_ORIGINS</td><td>localhost:5173, :8080</td><td>adresy frontu, z których API przyjmuje zapytania</td></tr>
+    <tr><td>META_ACCESS_TOKEN</td><td>pusty</td><td>token Meta Ad Library API – bez niego skaner reklam nie działa, reszta tak</td></tr>
+    <tr><td>ADLIB_TRYB</td><td>na_zywo</td><td><code>na_zywo</code> albo <code>odtwarzanie</code> (zapisane odpowiedzi z <code>data/adlib/nagrania</code>, bez sieci)</td></tr>
+    <tr><td>IMAGE_MODELS</td><td>wszystkie</td><td>modele obrazu pobierane przez <code>init</code></td></tr>
+    <tr><td>PRELOAD_MODELS</td><td>1</td><td>1 = modele tekstu i audio pobierane przy starcie; 0 = przy pierwszej analizie</td></tr>
+    <tr><td>SEED_DIRS</td><td>data/BACKUP data/DANE</td><td>foldery wczytywane przez <code>seed</code> do pustej bazy</td></tr>
+    <tr><td>SEED_ASR</td><td>1</td><td>0 = wczytywanie bez transkrypcji filmów (szybciej)</td></tr>
+    <tr><td>TORCH_INDEX</td><td>wersja CPU</td><td>źródło PyTorcha (GPU: <code>docker-compose.gpu.yml</code>)</td></tr>
+  </tbody>
+</table>
+<p>Progi i parametry modułów są w <code>config/obraz.toml</code> (obraz), <code>config/adlib.toml</code> (skaner) i w kodzie grupowania (<code>src/fakecollector/grouping/compare.py</code>) – każdy z opisem źródła wartości.</p>
+<h3>Token Meta Ad Library API</h3>
+<ol>
+  <li>Załóż aplikację na developers.facebook.com i potwierdź tożsamość dla Ad Library API (facebook.com/ads/library/api).</li>
+  <li>W Graph API Explorer wygeneruj token użytkownika; w Access Token Debugger przedłuż go do ok. 60 dni.</li>
+  <li>Wpisz go do <code>.env</code>: <code>META_ACCESS_TOKEN=…</code> i uruchom ponownie: <code>docker compose up -d</code>.</li>
+  <li>Stan skanera: http://localhost:8000/adlib/status; skan od razu: <code>docker compose exec scheduler python -m fakecollector.adlib --raz</code>.</li>
+</ol>
+</section>
+
+<section>
+<p class="kicker"><b>07</b> / Sprawdzenie działania</p>
+<h2>Testy <span class="red">i ewaluacja</span></h2>
+<pre><code>docker compose exec app python scripts/smoke_test.py --fast    <span class="c"># bez ciężkich modeli, ok. 2 min</span>
+docker compose exec app python scripts/smoke_test.py           <span class="c"># pełny test, ok. 5 min</span></code></pre>
+<p>Testy, które potrzebują paczki organizatora, są pomijane („POMINIĘTO”), gdy nie ma jej w <code>data/</code>. Ewaluacja grupowania (wymaga paczki i etykiet w <code>data/labels.csv</code>, opis w METODYKA.pdf, sekcja 11):</p>
+<pre><code>docker compose exec app python -m fakecollector.eval labels    <span class="c"># szkic etykiet z obecnych kampanii (do przejrzenia)</span>
+docker compose exec app python -m fakecollector.eval run       <span class="c"># raport: data/eval/raport.md</span></code></pre>
+</section>
+
+<section>
+<p class="kicker"><b>08</b> / Wdrożenie na serwer i CI/CD</p>
+<h2>Ten sam kod <span class="red">na publicznym serwerze</span></h2>
+<figure><img src="img/wdrozenie.png" alt="Wdrożenie: push do main, GitHub Actions, SSH, compose na serwerze, tetracore.pl"></figure>
+<p><code>docker-compose.prod.yml</code> uruchamia <code>postgres</code>, <code>neo4j</code>, <code>api</code> (pod <code>/api</code>), <code>scheduler</code> i <code>web</code> – Caddy, który sam pobiera certyfikat HTTPS (Let's Encrypt) dla domeny z <code>.env</code>. Porty 80 i 443 to jedyne wystawione na zewnątrz. Demo działa na VPS: 6 vCPU, 12 GB RAM.</p>
+<pre><code>git clone &lt;adres repozytorium&gt; ~/tetra &amp;&amp; cd ~/tetra
+cat &gt; .env &lt;&lt;'EOF'
+COMPOSE_FILE=docker-compose.prod.yml
+DOMAIN=twoja-domena.pl
+POSTGRES_PASSWORD=…
+NEO4J_PASSWORD=…
+META_ACCESS_TOKEN=…            <span class="c"># opcjonalnie – skaner reklam</span>
+EOF
+docker compose up -d --build
+docker compose run --rm api python -m fakecollector.bootstrap   <span class="c"># raz: schemat bazy i modele</span></code></pre>
+<p>Domena musi wskazywać (rekord A) na adres serwera, zanim Caddy poprosi o certyfikat.</p>
+<table>
+  <thead><tr><th style="width:20%">Workflow</th><th style="width:30%">Uruchamia go</th><th>Co robi</th></tr></thead>
+  <tbody>
+    <tr><td>back.yml</td><td>push do <code>main</code> w <code>src/</code>, <code>config/</code>, <code>scripts/</code> …</td><td>sprawdza składnię Pythona i <code>docker-compose.prod.yml</code>, potem przez SSH: <code>git pull</code> i <code>docker compose up -d --build api scheduler</code></td></tr>
+    <tr><td>front.yml</td><td>push do <code>main</code> w <code>front/</code></td><td>buduje front i sprawdza Caddyfile, potem przez SSH: <code>docker compose up -d --build --no-deps web</code></td></tr>
+  </tbody>
+</table>
+<p>Ustawienia repozytorium (Settings → Secrets and variables → Actions): zmienne <code>VPS_HOST</code>, <code>VPS_USER</code>, sekrety <code>VPS_SSH_KEY</code> (klucz prywatny do logowania), <code>VPS_KNOWN_HOSTS</code> (wynik <code>ssh-keyscan</code> serwera). Oba workflowy mają wspólną grupę <code>concurrency</code>, więc dwa wdrożenia nie nakładają się na serwerze.</p>
+</section>
+
+<section>
+<p class="kicker"><b>09</b> / Front w trybie deweloperskim</p>
+<h2>Dla zespołu</h2>
+<pre><code>cd front
+npm install
+npm run dev        <span class="c"># http://localhost:5173, API: http://localhost:8000 (VITE_API_URL)</span></code></pre>
+</section>
+
+<section>
+<p class="kicker"><b>10</b> / Problemy</p>
+<h2>Objaw <span class="red">→ rozwiązanie</span></h2>
+<table>
+  <thead><tr><th style="width:34%">Objaw</th><th>Przyczyna i rozwiązanie</th></tr></thead>
+  <tbody>
+    <tr><td>429 Too Many Requests przy pobieraniu obrazów</td><td>limit Docker Hub dla niezalogowanych → <code>docker login</code> i ponów</td></tr>
+    <tr><td>build przerywa się (Killed, brak pamięci)</td><td>za mało RAM dla Dockera → zwiększ do ≥ 8 GB w ustawieniach Docker Desktop</td></tr>
+    <tr><td><code>docker compose up -d</code> długo „czeka”</td><td>przy pierwszym starcie <code>init</code> pobiera modele – <code>docker compose logs -f init</code></td></tr>
+    <tr><td><code>init</code> zgłasza, że nie pobrał modelu (np. MagFace z Google Drive)</td><td>system działa bez niego (moduł obrazu zgłosi brak); ponów: <code>docker compose run --rm init</code></td></tr>
+    <tr><td>port zajęty</td><td>zmień port w <code>.env</code> (np. <code>WEB_PORT=8081</code>)</td></tr>
+    <tr><td>antywirus pokazuje „zablokowano adres” podczas analizy linku</td><td>ochrona sieci hosta blokuje stronę scamu otwieraną w kontenerze – to bezpieczne; system analizuje wtedy zapisane materiały i oznacza stronę jako niedziałającą</td></tr>
+    <tr><td>materiał z paczki ma 0 słów tekstu</td><td>antywirus usunął plik HTML – rozpakuj paczkę ponownie z wyjątkiem w antywirusie</td></tr>
+    <tr><td>skaner reklam: „brak tokenu”</td><td>ustaw <code>META_ACCESS_TOKEN</code> w <code>.env</code></td></tr>
+    <tr><td>pull access denied for fakecollector-app</td><td>stara wersja Compose – zaktualizuj Docker Desktop albo najpierw <code>docker compose build</code></td></tr>
+  </tbody>
+</table>
+<div class="note"><span class="hand">nie otwieraj linków ze scamów we własnej przeglądarce</span>
+<p>System otwiera je wyłącznie w kontenerze (Chromium w obrazie <code>app</code>, adresy sieci prywatnej zablokowane).</p></div>
+</section>
+</body></html>

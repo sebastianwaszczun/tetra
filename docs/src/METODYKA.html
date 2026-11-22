@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>Metodyka</title>
+<link rel="stylesheet" href="style.css">
+<style>@page { @bottom-left { content: "TETRA · Metodyka"; } }</style>
+</head><body>
+
+<div class="cover">
+  <img class="cat" src="img/kot.png" alt="">
+  <p class="brand">TETRA</p>
+  <p class="sub">FAKE-TRACE</p>
+  <h1 class="title">Metodyka</h1>
+  <p class="lead">jak pozyskujemy cechy, liczymy podobieństwo i grupujemy materiały w kampanie</p>
+  <div class="toc">
+    <div class="label">Spis treści</div>
+    <ol>
+      <li><b>01</b>Założenia</li><li><b>02</b>Potok</li><li><b>03</b>Wejście i preprocessing</li>
+      <li><b>04</b>Cechy – co liczy każdy moduł</li><li><b>05</b>Rekord materiału i kandydaci</li>
+      <li><b>06</b>Podobieństwo pary</li><li><b>07</b>Grupowanie</li>
+      <li><b>08</b>Prezentacja wyników i wyjaśnienia</li><li><b>09</b>Niekompletne dane i duplikaty</li>
+      <li><b>10</b>Skaner Biblioteki Reklam Meta</li><li><b>11</b>Ewaluacja</li><li><b>12</b>Ograniczenia i rozwój</li>
+    </ol>
+  </div>
+  <div class="meta"><span><b>HackNation 2026</b> · wyzwanie NASK „Follow the fake”</span><span>Dokumentacja projektu · 22.11.2026</span></div>
+</div>
+
+<p class="intro">Dokument opisuje, jak system pozyskuje cechy, liczy podobieństwo i grupuje materiały – zgodnie z punktem 4 treści zadania. Przy każdym kroku podajemy progi i ich źródło, żeby wynik dało się odtworzyć i uzasadnić. Pozostałe dokumenty: <b>INSTALACJA.pdf</b>, <b>KAMPANIE.pdf</b>, <b>LICENCJE.pdf</b>.</p>
+
+<section>
+<p class="kicker"><b>01</b> / Założenia</p>
+<h2>Do której kampanii należy <span class="red">i dlaczego</span></h2>
+<ol>
+  <li><strong>Nie oceniamy, czy pojedyncza reklama jest fałszywa.</strong> Zgodnie z zadaniem wejście jest podejrzane z założenia (zgłoszenie, materiał z paczki, reklama wybrana przez skaner). Pytanie brzmi: do której kampanii należy, z czym się łączy i dlaczego.</li>
+  <li><strong>Każde połączenie ma przesłanki zapisane zdaniami</strong> („ten sam Pixel Meta …”, „100% wspólnych fragmentów tekstu”). Wynik liczbowy bez przesłanki nie jest pokazywany jako powiązanie.</li>
+  <li><strong>Dwa poziomy powiązań.</strong> Kampania = ta sama treść (artykuł, kreacja, nagranie). Operator = ta sama infrastruktura (piksel, konto reklamowe, kit, serwer) przy różnej treści. Operator łączy kampanie, ale ich nie scala.</li>
+  <li><strong>Braki nie karzą.</strong> Materiał bez strony, nagrania albo tekstu porównujemy tym, co ma. Brakujący moduł nie obniża wyniku – po prostu nic nie dodaje.</li>
+  <li><strong>Zmienne fragmenty są maskowane.</strong> Oszuści podmieniają nazwiska, kwoty i domeny między odsłonami kampanii, więc porównujemy też szkielet tekstu, w którym te elementy zastępują znaczniki.</li>
+</ol>
+</section>
+
+<section>
+<p class="kicker"><b>02</b> / Potok</p>
+<h2>Od wejścia do kampanii</h2>
+<figure><img src="img/potok.png" alt="Potok: wejście, preprocessing, cztery moduły cech, rekord, kandydaci, porównanie par, kampanie i operatorzy, GUI"></figure>
+<table>
+  <thead><tr><th style="width:24%">Etap</th><th style="width:36%">Kod</th><th>Wynik</th></tr></thead>
+  <tbody>
+    <tr><td>Preprocessing</td><td><code>src/fakecollector/ingest/</code></td><td><code>Incident</code>: składniki dla modułów, braki, odcisk duplikatu</td></tr>
+    <tr><td>Moduły cech</td><td><code>src/fakecollector/features/</code> <span class="muted">text · osint · image · av</span></td><td>cechy i przesłanki każdego modułu</td></tr>
+    <tr><td>Rekord</td><td><code>src/fakecollector/record/</code></td><td>podsumowanie, pełne cechy (JSONB), wektory, klucze wyszukiwania</td></tr>
+    <tr><td>Grupowanie</td><td><code>src/fakecollector/grouping/</code></td><td>pary z wynikiem i przesłankami, kampanie, grupy operatorów</td></tr>
+    <tr><td>Graf</td><td><code>src/fakecollector/graph/</code></td><td>węzły i krawędzie dla frontu, kopia w Neo4j</td></tr>
+    <tr><td>Skaner</td><td><code>src/fakecollector/adlib/</code></td><td>reklamy z Biblioteki Reklam Meta wysyłane do analizy</td></tr>
+    <tr><td>Ewaluacja</td><td><code>src/fakecollector/eval/</code></td><td>metryki jakości względem etykiet</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>03</b> / Wejście i preprocessing</p>
+<h2>Dowolne wejście <span class="red">→ składniki dla modułów</span></h2>
+<p><strong>Przyjmowane wejścia:</strong> adres URL, tekst (SMS, treść reklamy, e-mail), zrzut ekranu, plik HTML/MHTML, zapis ruchu HAR, film i nagranie audio, JSON z metadanymi (np. <code>.info.json</code> z yt-dlp), archiwum ZIP, cały folder przypadku (np. <code>data/DANE/14</code>) oraz dowolna kombinacja tekstu i plików z frontu.</p>
+<ul>
+  <li><strong>Rozpoznaje rodzaj wejścia</strong> po rozszerzeniu i zawartości (np. plik <code>.har</code> bez nazwy, strumień HLS, <code>.ts</code> z wideo zamiast TypeScriptu).</li>
+  <li><strong>Otwiera link wyłącznie w kontenerze</strong> – Playwright/Chromium z mobilnym user-agentem aplikacji Facebooka, HTTPX jako zapas – blokuje adresy prywatne (ochrona przed SSRF) i zapisuje HTML, HAR, zrzut i łańcuch przekierowań. Strona błędu (502, „domain for sale”, Cloudflare challenge) nie zastępuje zapisanych materiałów: status to wtedy <code>dead</code>, a w brakach pojawia się „strona nie działa – analiza oparta na zapisanych materiałach”.</li>
+  <li><strong>Wybiera tekst według wiarygodności źródła:</strong> tekst wpisany &gt; treść strony (HTML &gt; tekst strony &gt; HAR, osobno dla każdej strony) &gt; reklama z Biblioteki &gt; JSON &gt; transkrypcja &gt; OCR. Źródło krótsze niż 15 słów ustępuje następnemu. Popularne domeny (google.com, facebook.com, amazon.com…) znalezione w tekście lub na zrzucie nie są adresem strony oszustów.</li>
+  <li><strong>Wykrywa duplikaty</strong> po odcisku wejścia (hash znormalizowanego tekstu, plików i adresu bez parametrów śledzących). Duplikat dostaje wynik 1,0 z oryginałem i zawsze trafia do jego kampanii.</li>
+  <li><strong>Zapisuje braki</strong> (<code>missing</code>), np. „moduł audio i wideo: brak nagrań”, „strona nie została pobrana”. Front pokazuje je przy materiale.</li>
+</ul>
+<table>
+  <thead><tr><th style="width:24%">Moduł</th><th>Dostaje składniki</th></tr></thead>
+  <tbody>
+    <tr><td>tekst</td><td>wybrany tekst materiału i jego źródło (<code>text_origin</code>)</td></tr>
+    <tr><td>OSINT</td><td>adresy, HAR, HTML, JSON</td></tr>
+    <tr><td>obraz</td><td>zrzuty ekranu, obrazy ze strony, klatki filmów (do 12 na film, do 40 obrazów na materiał)</td></tr>
+    <tr><td>audio i wideo</td><td>filmy (także sklejone ze strumieni HLS <code>.m3u8</code> + <code>.ts</code>), nagrania audio</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>04</b> / Cechy</p>
+<h2>Co liczy <span class="red">każdy moduł</span></h2>
+
+<h3>4.1 Tekst <span class="muted">· features/text</span></h3>
+<table>
+  <thead><tr><th style="width:24%">Cecha</th><th>Jak</th></tr></thead>
+  <tbody>
+    <tr><td>osoby, marki</td><td>słowniki (<code>lexicons/osoby.txt</code>, <code>marki.txt</code>) z odmianą nazwisk</td></tr>
+    <tr><td>kwoty, procenty, linki, e-maile, telefony</td><td>wyrażenia regularne</td></tr>
+    <tr><td>znaczniki perswazji</td><td>6 grup: zysk, pilność, autorytet, tajemnica, sensacja, „wszyscy już zarabiają”</td></tr>
+    <tr><td>kategoria narracji</td><td>połowa: podobieństwo embeddingu do opisów kategorii, połowa: słowa-wskazówki; kategorie: fałszywy artykuł inwestycyjny, skandal, cudowny lek, sklep-wydmuszka, hazard, inne</td></tr>
+    <tr><td>szkielet</td><td>osoby, marki, kwoty, daty, adresy i telefony zastąpione znacznikami <code>&lt;OSOBA&gt;</code>, <code>&lt;KWOTA&gt;</code> …</td></tr>
+    <tr><td>odciski</td><td>SHA-256 znormalizowanego tekstu; MinHash (128 permutacji, shingle 5-wyrazowe) tekstu i szkieletu</td></tr>
+    <tr><td>embeddingi</td><td><code>paraphrase-multilingual-MiniLM-L12-v2</code> (384 wym.), średnia z fragmentów po 180 słów</td></tr>
+  </tbody>
+</table>
+<p><strong>Porównanie</strong> – średnia ważona dostępnych sygnałów: MinHash tekstu 0,30, MinHash szkieletu 0,25, kosinus szkieletu 0,20, kosinus tekstu 0,15, słowa kluczowe 0,05, ta sama narracja 0,05; identyczny hash wymusza 1,0. <strong>Wspólna osoba sama nie łączy</strong> – wiele niezależnych kampanii kradnie wizerunek tych samych celebrytów, więc osoba trafia do przesłanek, nie do wyniku. Pewność zależy od źródła tekstu (HTML 1,0, transkrypcja 0,8, OCR 0,6 × jakość OCR) i długości (poniżej 15 słów proporcjonalnie mniej).</p>
+
+<h3>4.2 OSINT – infrastruktura <span class="muted">· features/osint</span></h3>
+<p>Z HAR, HTML i (opcjonalnie) zapytań na żywo moduł wyciąga <strong>pivoty</strong>: znormalizowane pary (rodzaj, wartość) z wagą aprioryczną i zakresem – razem 70 rodzajów.</p>
+<table>
+  <thead><tr><th style="width:15%">Zakres</th><th>Przykłady (waga)</th><th style="width:17%">Poziom</th></tr></thead>
+  <tbody>
+    <tr><td>identity</td><td>domena rejestrowalna (1,0), host strony docelowej (0,9), ID reklamy Meta (1,0)</td><td class="k">kampania</td></tr>
+    <tr><td>operator</td><td>Pixel Meta (0,95), GA4/GTM (0,9), konto Google Ads, token weryfikacji domeny Meta (0,95), telefon, e-mail, Telegram (0,9), portfel krypto (1,0), kampania w TDS (0,65)</td><td class="k">operator</td></tr>
+    <tr><td>kit</td><td>katalog wdrożenia kitu (0,9), identyczny własny JS (0,85), CSS, endpoint API/beacona (0,75), host aktora (0,8), favicona (0,7), schemat parametrów URL (0,5)</td><td class="k">operator</td></tr>
+    <tr><td>infra</td><td>IP poza CDN (0,6), ten sam certyfikat TLS (0,95), domeny w jednym certyfikacie (0,9), NS, MX, partia rejestracji (0,45)</td><td class="k">operator</td></tr>
+    <tr><td>behavior</td><td>rodzina TDS, zestaw bibliotek, generator strony (0,02–0,4)</td><td class="k">operator <span class="muted">(słabe)</span></td></tr>
+  </tbody>
+</table>
+<p><strong>Wzbogacenie</strong> (<code>enrich</code>, 16 wątków, budżet 45 s, cache 24 h): DNS (A/NS/MX/TXT/SOA), RDAP/WHOIS domeny (wiek, rejestrator), RDAP IP i ASN, certyfikat TLS, Certificate Transparency (crt.sh). Z nich powstają flagi ryzyka domeny, np. <code>registrar_or_parking_ns</code>, <code>sinkhole_ip</code>, <code>tls_cert_mismatch</code>, <code>likely_taken_down</code>.</p>
+<p><strong>Ochrona przed szumem:</strong> zasoby kopiowane razem z wyglądem podszywanego serwisu (skrypty Facebooka i Google zapisane z artykułem, favicona Gazeta.pl/TVN24, beacony analityki) są oznaczane jako „vendor” i nie tworzą pivotów kitu. Wkład pivotu jest mnożony przez rzadkość wartości w bazie (IDF: <code>min(1, 1,5 / log₂(df + 1))</code>) – IP Cloudflare'a dzielone przez setki stron samo się wygasza.</p>
+
+<h3>4.3 Obraz <span class="muted">· features/image</span></h3>
+<table>
+  <thead><tr><th style="width:17%">Cecha</th><th style="width:38%">Jak</th><th>Próg i źródło</th></tr></thead>
+  <tbody>
+    <tr><td>hashe percepcyjne</td><td>pHash i dHash obrazu i jego środka (80%)</td><td><code>T_p = 4</code>, <code>T_d = 14</code> bitów – kalibracja na obrazach stron NASK (3570 par kontrolnych, 935 transformacji)</td></tr>
+    <tr><td>ten sam kadr</td><td>punkty ORB + homografia RANSAC</td><td>wycięty lub przeskalowany fragment kreacji (np. zrzut z telefonu) – min. 18 zgodnych punktów</td></tr>
+    <tr><td>wygląd</td><td>embedding <strong>CLIP ViT-B-32</strong> całego obrazu</td><td>kosinus ≥ 0,68 = „podobny wygląd” (najwyższa para różnych zgłoszeń: 0,654 z 48)</td></tr>
+    <tr><td>elementy szablonu, logo</td><td>wycinki (rogi, pasek) oceniane opisami i wzorcami logo; <strong>SigLIP 2 ViT-B-16</strong> dla logo</td><td>≥ 2 wspólne wyróżniające elementy; progi każdego elementu i marki skalibrowane na 13 kreacjach</td></tr>
+    <tr><td>twarze</td><td>detekcja SCRFD/YuNet, wektory ArcFace (buffalo_l) i SFace (drugi głos), jakość twarzy MagFace</td><td>ta sama twarz: kosinus ≥ 0,3735; osoba z bazy referencyjnej: ≥ 0,3894 i margines 0,21 nad drugą osobą (sprawdzian „wyjmij jedno” na 19 referencjach + 2 kontrole spoza bazy)</td></tr>
+    <tr><td>kody QR</td><td>odczyt QR (z powiększeniem 2× i 3×)</td><td>ta sama treść kodu = silny dowód</td></tr>
+    <tr><td>deepfake</td><td>facetorch (EfficientNet), wynik orientacyjny</td><td>tylko informacja, nie łączy materiałów</td></tr>
+  </tbody>
+</table>
+<p><strong>Dowody obrazu mają siłę</strong> (<code>config/obraz.toml</code>, sekcja <code>[dowody]</code>), która mnoży wynik:</p>
+<table>
+  <thead><tr><th style="width:17%">Siła</th><th style="width:12%" class="num">Mnożnik</th><th>Dowody</th></tr></thead>
+  <tbody>
+    <tr><td>silny</td><td class="num">1,0</td><td>identyczny plik, ta sama kreacja (zgodne hashe), ten sam kadr, ta sama twarz, ten sam kod QR</td></tr>
+    <tr><td>średni</td><td class="num">0,75</td><td>podobny wygląd, wspólne elementy szablonu</td></tr>
+    <tr><td>słaby</td><td class="num">0,35</td><td>ta sama znana osoba, wspólne logo – mogą wystąpić w różnych kampaniach</td></tr>
+  </tbody>
+</table>
+<p>Obrazki obecne w dużej części bazy (logo podszywanego serwisu) nie łączą materiałów. Te same kreacje, zrzuty i klatki to ślad kampanii, a te same obrazy z zasobów strony (zdjęcia w artykule) – ślad operatora. <strong>Baza referencyjna osób</strong> (<code>data/reference_people/&lt;osoba&gt;/</code> ze zdjęciami i <code>zrodla.json</code> z licencjami) pozwala nazwać osobę na zdjęciu („na obrazach: Rafał Brzoska”). Wielkość bazy nie jest kluczowa – na demo wystarcza kilka najczęściej podszywanych osób.</p>
+
+<h3>4.4 Audio i wideo <span class="muted">· features/av</span></h3>
+<table>
+  <thead><tr><th style="width:17%">Cecha</th><th style="width:38%">Jak</th><th>Po co</th></tr></thead>
+  <tbody>
+    <tr><td>transkrypcja</td><td>Whisper small</td><td>treść mowy trafia do modułu tekstu (<code>origin = transcript</code>)</td></tr>
+    <tr><td>odcisk głosu</td><td>SpeechBrain ECAPA-TDNN (192 wym.), średnia z 3-sekundowych fragmentów mowy</td><td>ten sam lektor lub sklonowany głos; kosinus 0,55 → 0 i 0,80 → 1, porównanie par nagrań</td></tr>
+    <tr><td>odcisk dźwięku</td><td>pary szczytów widma (metoda Shazama), krok 256 próbek</td><td>ta sama ścieżka mimo przycięcia, kompresji, zmiany głośności; ≥ 12 zgodnych par</td></tr>
+    <tr><td>odcisk obrazu filmu</td><td>dHash 64 bity, 2 klatki/s</td><td>te same ujęcia; Hamming ≤ 10</td></tr>
+    <tr><td>napisy z ekranu</td><td>OCR 6 klatek</td><td>adresy i obietnice wypisane w filmie</td></tr>
+    <tr><td>metadane</td><td>ffprobe</td><td>słaba przesłanka (np. ten sam program kodujący; ogólne kodery są pomijane)</td></tr>
+  </tbody>
+</table>
+<div class="stats" style="--n:3">
+  <div class="stat"><b>1,0</b><span>przycięta, pomniejszona i przekodowana kopia filmu DANE/5</span></div>
+  <div class="stat"><b>1,0</b><span>sam dźwięk, fragment 60 s, MP3 64 kb/s</span></div>
+  <div class="stat"><b>0,0</b><span>inny film (DANE/14)</span></div>
+</div>
+</section>
+
+<section>
+<p class="kicker"><b>05</b> / Rekord materiału i kandydaci</p>
+<h2>Wektor cech, <span class="red">który da się porównać</span></h2>
+<p>Każdy materiał zapisujemy w Postgresie z rozszerzeniem pgvector:</p>
+<table>
+  <thead><tr><th style="width:22%">Tabela</th><th>Zawartość</th></tr></thead>
+  <tbody>
+    <tr><td>materials</td><td>podsumowanie: źródło, status, tytuł, domeny, osoby (z tekstu i z twarzy), marki, braki, kampania, decyzja analityka</td></tr>
+    <tr><td>material_features</td><td>pełne cechy każdego modułu (JSONB)</td></tr>
+    <tr><td>material_vectors</td><td>wektory: tekst, szkielet, CLIP/SigLIP, twarze, głos</td></tr>
+    <tr><td>material_keys</td><td>klucze wyszukiwania: domena, URL, SHA-256 tekstu, pasma LSH MinHash tekstu i szkieletu (32 × 4), telefony, e-maile, pivoty OSINT o wadze ≥ 0,5, SHA-256 i pHash obrazów, QR, wybrane hashe odcisku dźwięku</td></tr>
+  </tbody>
+</table>
+<p><strong>Kandydaci do porównania</strong> to materiały, które mają wspólny klucz, mają obraz w odległości pHash ≤ 8 albo ≥ 15 wspólnych hashy dźwięku, albo są najbliżej w przestrzeni wektorów (operator <code>&lt;=&gt;</code> w pgvector). Nie porównujemy więc każdej pary w bazie, a i tak nie gubimy wariantów z innej domeny.</p>
+</section>
+
+<section>
+<p class="kicker"><b>06</b> / Podobieństwo pary</p>
+<h2>Jawne łączenie <span class="red">wyników modułów</span></h2>
+<p>Każdy moduł zwraca wynik <i>s</i> (0–1) i pewność <i>c</i> (0–1) (<code>grouping/compare.py</code>):</p>
+<div class="note ink">
+  <p class="formula">s′ = max(0, (s − szum) / (1 − szum))<small>różne strony oszustów zawsze mają coś wspólnego – wynik poniżej progu szumu nic nie wnosi</small></p>
+  <p class="formula">w = rzetelność × c × s′<small>wkład modułu</small></p>
+  <p class="formula">S = 1 − Π(1 − w)<small>jeden pewny dowód wystarcza, kilka średnich się wzmacnia, brak modułu nic nie odejmuje</small></p>
+</div>
+<table>
+  <thead><tr><th style="width:15%">Moduł</th><th class="num" style="width:11%">Rzetelność</th><th class="num" style="width:11%">Próg szumu</th><th>Do kampanii liczy się</th><th style="width:22%">Do operatora</th></tr></thead>
+  <tbody>
+    <tr><td>tekst</td><td class="num">1,00</td><td class="num">0,25</td><td>cały wynik tekstu</td><td>–</td></tr>
+    <tr><td>OSINT</td><td class="num">1,00</td><td class="num">0,30</td><td>tylko pivoty <code>identity</code> (ta sama domena, ta sama reklama Meta)</td><td>pivoty operator, kit, infra, behavior</td></tr>
+    <tr><td>audio i wideo</td><td class="num">0,95</td><td class="num">0,30</td><td>cały wynik</td><td>–</td></tr>
+    <tr><td>obraz</td><td class="num">0,90</td><td class="num">0,40</td><td>kreacje, zrzuty, klatki, twarz lektora</td><td>wspólne obrazy z zasobów stron</td></tr>
+  </tbody>
+</table>
+<p><strong>Wynik operatora:</strong> <code>S_op = 1 − (1 − S) · Π(1 − w_infra)</code> – kampania zawsze należy do swojego operatora, a wspólna infrastruktura łączy też kampanie o innej treści.</p>
+<h3>Reguły przeciw fałszywym połączeniom <span class="muted">(z analizy błędów na paczce)</span></h3>
+<ul>
+  <li><strong>Ślady wszechobecne.</strong> Ślad kopiujący się z wyglądem podszywanego serwisu (favicona, CSS/JS, beacony, układ ścieżek, szkielet DOM, rodzina kitu…) obecny w &gt; 30% materiałów (i w &gt; 3, przy bazie ≥ 6) nie łączy. Identyfikatory kont (Pixel, GA4, GTM), katalog kitu, serwery aktora i certyfikaty łączą zawsze – dominujący operator też może być „wszechobecny”.</li>
+  <li><strong>Wspólna domena</strong> łączy w kampanię tylko materiały o tym samym zestawie domen docelowych; przy różnych zestawach (jedna strona z kilku w przypadku) to ślad operatora.</li>
+  <li><strong>Duplikat</strong> (ten sam odcisk wejścia) – wynik 1,0.</li>
+</ul>
+</section>
+
+<section>
+<p class="kicker"><b>07</b> / Grupowanie</p>
+<h2>Przypisanie, weryfikacja, <span class="red">nowy wzorzec</span></h2>
+<figure><img src="img/decyzja.png" alt="Ścieżka nowego materiału: duplikat, kandydaci, wynik i cztery możliwe decyzje"></figure>
+<table>
+  <thead><tr><th style="width:18%">Wynik pary</th><th>Decyzja</th></tr></thead>
+  <tbody>
+    <tr><td>≥ 0,75</td><td>ta sama kampania (przypisany)</td></tr>
+    <tr><td>0,50–0,75</td><td>do weryfikacji – materiał trafia do kampanii najbliższego sąsiada, decyduje analityk</td></tr>
+    <tr><td>&lt; 0,50</td><td>brak powiązania; materiał bez żadnego połączenia to <strong>nowy wzorzec</strong> (kampania z jednym materiałem)</td></tr>
+  </tbody>
+</table>
+<ul>
+  <li><strong>Kampanie</strong> = spójne składowe grafu krawędzi ≥ 0,75 (union-find). Przy małym zbiorze to prostsze i lepiej wyjaśnialne niż klasteryzacja gęstościowa (HDBSCAN): każde połączenie wynika z konkretnej pary i jej przesłanek.</li>
+  <li><strong>Operatorzy</strong> (grupy podobnych kampanii) = spójne składowe kampanii połączonych wynikiem operatora ≥ 0,75.</li>
+  <li><strong>Nowy materiał</strong> (<code>POST /analyze</code>) jest porównywany z kandydatami i przypisywany przyrostowo; jeśli pewnie pasuje do dwóch dotąd osobnych kampanii, kampanie są scalane. <code>python -m fakecollector.grouping rebuild</code> przelicza całość.</li>
+  <li><strong>Decyzje analityka</strong> (potwierdź / odrzuć / cofnij) dotyczą par materiałów i przetrwają przeliczenie.</li>
+  <li><strong>Etykieta kampanii:</strong> osoba najczęściej wymieniana w tekstach członków („bohater”) i główna domena, np. „Rafał Brzoska · dorquesio.click (+5 domen)”.</li>
+</ul>
+</section>
+
+<section>
+<p class="kicker"><b>08</b> / Prezentacja wyników i wyjaśnienia</p>
+<h2>Dlaczego A i B <span class="red">są razem</span></h2>
+<p>Każde powiązanie w GUI ma wynik, wkład każdego modułu i przesłanki zdaniami. Te same dane zwraca API (<code>GET /compare?a=…&amp;b=…</code>, <code>GET /graph</code>), a kopia grafu jest w Neo4j.</p>
+<table>
+  <thead><tr><th style="width:20%">Widok</th><th>Co pokazuje</th></tr></thead>
+  <tbody>
+    <tr><td>Analiza</td><td>formularz: tekst, link i dowolne pliki naraz; wynik: status i braki, cechy z modułów, przypisana kampania i najbliższe materiały z przesłankami</td></tr>
+    <tr><td>Przegląd kampanii</td><td>kartoteka kampanii (etykieta, liczba materiałów, domeny, osoby), mapa wszystkich kampanii jako graf 2D (szkic) albo 3D, ostatnie reklamy ze skanera Biblioteki Reklam</td></tr>
+    <tr><td>Kampania</td><td>materiały z miniaturami, graf powiązań, panel <strong>„Dlaczego połączone?”</strong> z wkładem modułów i przesłankami dla wybranej krawędzi, najmocniejsze powiązania, kampanie tego samego operatora, decyzje analityka</td></tr>
+    <tr><td>Operator</td><td>kampanie o różnej treści ze wspólną infrastrukturą i ślady, które je łączą</td></tr>
+    <tr><td>Materiał</td><td>co w nim jest (moduły, braki, obrazy), tekst, kampania i otoczenie materiału w grafie</td></tr>
+    <tr><td>Neo4j Browser</td><td>ten sam graf do własnych zapytań Cypher (<code>python -m fakecollector.graph sync</code>)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>09</b> / Niekompletne dane i duplikaty</p>
+<h2>Braki <span class="red">nie zatrzymują analizy</span></h2>
+<table>
+  <thead><tr><th style="width:27%">Sytuacja</th><th>Zachowanie</th></tr></thead>
+  <tbody>
+    <tr><td>strona nie działa</td><td>analiza zapisanych materiałów (HAR, HTML, zrzut); w brakach: „strona nie działa”; OSINT dalej daje dane domeny</td></tr>
+    <tr><td>sam zrzut ekranu</td><td>obraz (hashe, wygląd, twarze) + OCR do modułu tekstu; wynik w demo: 0,90 do właściwej kampanii</td></tr>
+    <tr><td>sam tekst z linkiem</td><td>tekst + OSINT domeny; wynik w demo: 0,99 do właściwej kampanii przy niedziałającej stronie</td></tr>
+    <tr><td>sam film</td><td>odcisk dźwięku, obrazu i głosu + transkrypcja + klatki do modułu obrazu</td></tr>
+    <tr><td>urwany strumień wideo</td><td>kawałki <code>.ts</code> sklejane w jeden plik; brakujące zapisane w brakach</td></tr>
+    <tr><td>ten sam materiał drugi raz</td><td>wykryty duplikat, wynik 1,0 z oryginałem</td></tr>
+    <tr><td>antywirus na hoście blokuje stronę</td><td>traktowane jak niedziałająca strona (zob. INSTALACJA.pdf)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>10</b> / Skaner Biblioteki Reklam Meta</p>
+<h2>Punkty dodatkowe <span class="red">z zadania</span></h2>
+<ul>
+  <li><strong>Harmonogram:</strong> skan co 3 h (reklamy scamowe żyją 0–3 dni), okno 3 dni wstecz, raz na dobę sprawdzenie, czy Meta zdjęła przeanalizowane reklamy (<code>config/adlib.toml</code>).</li>
+  <li><strong>Zapytania</strong> do Ad Library API (kraj PL): frazy typowe dla oszustw („pasywny dochód”, „platforma inwestycyjna”, „lekarze ukrywają”…), frazy wyciągnięte z wcześniejszych trafień i inne reklamy stron-reklamodawców już oznaczonych jako podejrzane.</li>
+  <li><strong>Filtr wstępny:</strong> wynik = 1 − Π(1 − waga) po sygnałach – domena na Liście Ostrzeżeń CERT Polska 0,6, osoba + narracja scamowa 0,45, płatnik, strona udająca media, młoda strona, presja, marki…; próg 0,5 (skan na żywo 1026 reklam: zwykłe reklamy z frazami zysku do ok. 0,45). Do pełnej analizy trafia najwyżej 20 reklam na skan.</li>
+  <li><strong>Pełna analiza przez ten sam <code>/analyze</code></strong> – reklama z Biblioteki przechodzi identyczny proces jak zgłoszenie od człowieka i trafia do kampanii albo jako nowy wzorzec.</li>
+</ul>
+<div class="stats">
+  <div class="stat"><b>1001</b><span>reklam w skanie 22.11.2026</span></div>
+  <div class="stat"><b>984</b><span>odrzuconych przez filtr wstępny</span></div>
+  <div class="stat"><b>17</b><span>przeanalizowanych przez cały potok</span></div>
+  <div class="stat"><b>co 3 h</b><span>kolejny skan</span></div>
+</div>
+</section>
+
+<section>
+<p class="kicker"><b>11</b> / Ewaluacja</p>
+<h2>Pomiar <span class="red">na etykietach</span></h2>
+<p>Etykiety: <code>data/labels.csv</code> – kampania (i opcjonalnie operator) dla 25 materiałów z paczki, przejrzane ręcznie (<code>python -m fakecollector.eval run</code>).</p>
+<table>
+  <thead><tr><th style="width:24%">Miara</th><th>Jak</th><th style="width:30%">Punkt walidacji z zadania</th></tr></thead>
+  <tbody>
+    <tr><td>precyzja, czułość, F1 par; ARI</td><td>pary materiałów i podział względem etykiet</td><td>identyfikowanie wariantów tej samej kampanii</td></tr>
+    <tr><td>„wyjmij jeden”</td><td>każdy materiał udaje nowy i jest przypisywany do reszty bazy</td><td>przypisywanie nowych materiałów</td></tr>
+    <tr><td>„wyjmij kampanię”</td><td>cała kampania udaje nieznaną – nie może się dokleić</td><td>materiały, których nie należy łączyć</td></tr>
+    <tr><td>ablacja</td><td>wynik bez każdego modułu i z samym modułem</td><td>przydatność cech, odporność na braki</td></tr>
+    <tr><td>przegląd progów</td><td>F1 i ARI dla progów 0,50–0,95</td><td>uzasadnienie progu 0,75</td></tr>
+  </tbody>
+</table>
+<p class="muted">Wyniki: 25 materiałów, 18 kampanii (3 z ≥ 2 materiałami), 300 par.</p>
+<div class="stats">
+  <div class="stat"><b>100%</b><span>F1 par – 17 dobrych, 0 błędnych, 0 przeoczonych</span></div>
+  <div class="stat"><b>10 / 10</b><span>nowy wariant znanej kampanii trafia do niej</span></div>
+  <div class="stat"><b>15 / 15</b><span>materiał z nowej kampanii dostaje „nowy wzorzec”</span></div>
+  <div class="stat"><b>1,0</b><span>ARI; poziom operatora F1 100%</span></div>
+</div>
+<table>
+  <thead><tr><th>Ablacja</th><th class="num" style="width:14%">F1</th><th class="num" style="width:30%">nowy wariant → dobra kampania</th></tr></thead>
+  <tbody>
+    <tr><td>wszystkie moduły</td><td class="num">100%</td><td class="num">100%</td></tr>
+    <tr><td>bez tekstu</td><td class="num">94%</td><td class="num">60%</td></tr>
+    <tr><td>tylko tekst</td><td class="num">100%</td><td class="num">100%</td></tr>
+    <tr><td>tylko obraz</td><td class="num">94%</td><td class="num">60%</td></tr>
+    <tr><td>tylko OSINT</td><td class="num">11%</td><td class="num">20%</td></tr>
+    <tr><td>bez OSINT / bez obrazu / bez audio i wideo</td><td class="num">100%</td><td class="num">100%</td></tr>
+  </tbody>
+</table>
+<p><strong>Wnioski.</strong> Tekst i obraz niezależnie odtwarzają ponad 94% powiązań – system działa przy samym zrzucie albo samym tekście. OSINT na poziomie kampanii daje mało, bo oszuści rotują domeny (kampania Brzoski: 6 domen); jego rola to operator (F1 100%). Wynik jest identyczny dla progów 0,50–0,85 – wybrany próg 0,75 leży w środku stabilnego przedziału, więc nie jest dopasowany do danych na granicy.</p>
+<div class="note"><span class="hand">ograniczenia ewaluacji</span>
+<p>Zbiór jest mały (3 kampanie wieloelementowe, 10 przypadków „nowego wariantu”), a jedyny film w etykietach nie pozwala ocenić modułu audio i wideo na parach (moduł oceniono osobno na przerobionych kopiach – sekcja 4.4). Wagi i progi dobrano na podstawie wiedzy eksperckiej i analizy błędów, a następnie potwierdzono pomiarem; przy większym zbiorze etykiet można je dostroić regresją logistyczną na wynikach modułów (kod ewaluacji już liczy potrzebne wkłady par).</p></div>
+</section>
+
+<section>
+<p class="kicker"><b>12</b> / Ograniczenia i rozwój</p>
+<h2>Co dalej</h2>
+<ul>
+  <li><strong>Nazwa produktu jako wejście</strong> – krótki tekst bez linku i plików (np. „Kardivix”) jest dziś za krótki dla modułu tekstu. Kierunek: traktować go jako zapytanie do kartoteki (tytuły, teksty, domeny, marki) i do Biblioteki Reklam.</li>
+  <li><strong>Podobne domeny</strong> (typosquatting: <code>goldenflowerspoland.pl</code> / <code>goldenfiowerspoland.pl</code>) nie są dziś porównywane po podobieństwie nazwy – dobry kandydat na nowy pivot.</li>
+  <li><strong>Wagi modułów</strong> – do nauczenia, gdy powstanie większy zbiór etykiet.</li>
+  <li><strong>Strony za logowaniem</strong> (posty na Facebooku) – system pobierze ścianę logowania; potrzebny jest zrzut albo zapis HAR od zgłaszającego.</li>
+</ul>
+</section>
+</body></html>

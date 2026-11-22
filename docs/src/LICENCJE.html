@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>Licencje i ograniczenia</title>
+<link rel="stylesheet" href="style.css">
+<style>@page { @bottom-left { content: "TETRA · Licencje i ograniczenia"; } }
+table.libs td:nth-child(3) { font-weight: 700; color: #C9302B; }</style>
+</head><body>
+
+<div class="cover">
+  <img class="cat" src="img/kot.png" alt="">
+  <p class="brand">TETRA</p>
+  <p class="sub">FAKE-TRACE</p>
+  <h1 class="title">Licencje i ograniczenia</h1>
+  <p class="lead">biblioteki, modele, usługi zewnętrzne i dane wykorzystane w systemie</p>
+  <div class="toc">
+    <div class="label">Spis treści</div>
+    <ol>
+      <li><b>01</b>Najważniejsze ograniczenia</li><li><b>02</b>Modele uczenia maszynowego</li>
+      <li><b>03</b>Biblioteki Pythona</li><li><b>04</b>Front i fonty</li>
+      <li><b>05</b>Infrastruktura (obrazy Dockera)</li><li><b>06</b>Usługi zewnętrzne</li><li><b>07</b>Dane</li>
+    </ol>
+  </div>
+  <div class="meta"><span><b>HackNation 2026</b> · wyzwanie NASK „Follow the fake”</span><span>Dokumentacja projektu · 22.11.2026</span></div>
+</div>
+
+<p class="intro">Zgodnie z punktem 4 treści zadania wymieniamy wszystko, z czego korzysta system, wraz z licencją i ograniczeniami. Licencje sprawdzono w repozytoriach i kartach modeli w listopadzie 2026 r.; przy wdrożeniu produkcyjnym trzeba je zweryfikować ponownie.</p>
+
+<section>
+<p class="kicker"><b>01</b> / Najważniejsze ograniczenia</p>
+<h2>Cztery rzeczy, <span class="red">o których trzeba wiedzieć</span></h2>
+<div class="stats">
+  <div class="stat"><b>0</b><span>kluczy API potrzebnych do sprawdzenia działania</span></div>
+  <div class="stat"><b>1</b><span>model z ograniczeniem komercyjnym (InsightFace)</span></div>
+  <div class="stat"><b>CPU</b><span>wszystkie modele działają bez GPU</span></div>
+  <div class="stat"><b>0 B</b><span>danych organizatora w repozytorium</span></div>
+</div>
+<ol>
+  <li><strong>Modele twarzy InsightFace (<code>buffalo_l</code>) są dostępne tylko do niekomercyjnych badań.</strong> Kod InsightFace jest na licencji MIT, ale wytrenowane modele – nie. Do użytku komercyjnego trzeba kupić licencję albo przełączyć analizę twarzy na sam YuNet + SFace (MIT, Apache 2.0), które system już obsługuje: w <code>config/obraz.toml</code> w sekcji <code>[twarze]</code> zmienić <code>tryb = "oba"</code> na <code>tryb = "jeden"</code> i dopisać <code>model = "yunet_sface"</code>. Progi SFace są już skalibrowane w tym samym pliku (<code>[twarze.yunet_sface]</code>).</li>
+  <li><strong>Dane organizatora (paczka NASK) nie są rozpowszechniane</strong> – nie ma ich w repozytorium (<code>.gitignore</code>).</li>
+  <li><strong>Zdjęcia w bazie referencyjnej osób mają różne licencje</strong> (opisane w <code>zrodla.json</code> każdej osoby); część ma status „nieustalona – użycie wyłącznie lokalne” i nie jest publikowana (folder <code>data/</code>).</li>
+  <li><strong>Meta Ad Library API wymaga własnego tokenu</strong> i akceptacji warunków Meta; tokenu nie ma w repozytorium.</li>
+</ol>
+</section>
+
+<section>
+<p class="kicker"><b>02</b> / Modele uczenia maszynowego</p>
+<h2>Modele <span class="red">i ich źródła</span></h2>
+<table>
+  <thead><tr><th style="width:24%">Model</th><th style="width:20%">Do czego</th><th style="width:19%">Źródło</th><th style="width:19%">Licencja</th><th>Ograniczenia</th></tr></thead>
+  <tbody>
+    <tr><td>paraphrase-multilingual-MiniLM-L12-v2</td><td>embeddingi tekstu i szkieletu (384 wym.)</td><td>Hugging Face (sentence-transformers)</td><td>Apache 2.0</td><td>–</td></tr>
+    <tr><td>whisper-small</td><td>transkrypcja mowy</td><td>Hugging Face (OpenAI)</td><td>MIT</td><td>–</td></tr>
+    <tr><td>spkrec-ecapa-voxceleb (ECAPA-TDNN)</td><td>odcisk głosu</td><td>Hugging Face (SpeechBrain)</td><td>Apache 2.0</td><td>–</td></tr>
+    <tr><td>CLIP ViT-B-32 (openai) przez OpenCLIP</td><td>embedding wyglądu obrazu</td><td>OpenAI / OpenCLIP</td><td>MIT</td><td>–</td></tr>
+    <tr><td>SigLIP 2 ViT-B-16</td><td>logo i elementy szablonu (wycinki)</td><td>Hugging Face (Google, timm)</td><td>Apache 2.0</td><td>–</td></tr>
+    <tr><td>InsightFace buffalo_l (SCRFD-10GF + ArcFace R50 WebFace600K)</td><td>detekcja i wektory twarzy</td><td>deepinsight/insightface</td><td>modele: tylko niekomercyjne badania; kod: MIT</td><td class="red"><b>brak zgody na użycie komercyjne</b></td></tr>
+    <tr><td>OpenCV Zoo YuNet + SFace</td><td>drugi detektor i wektor twarzy</td><td>opencv/opencv_zoo</td><td>YuNet: MIT, SFace: Apache 2.0</td><td>–</td></tr>
+    <tr><td>MagFace iResNet100 (MS1MV2)</td><td>miara jakości twarzy</td><td>IrvingMeng/MagFace</td><td>Apache 2.0 (<code>features/image/MAGFACE_LICENSE</code>)</td><td>–</td></tr>
+    <tr><td>facetorch: EfficientNet B7 (deepfake, selimsef)</td><td>orientacyjna ocena deepfake</td><td>tomas-gajarsky/facetorch</td><td>MIT (model), Apache 2.0 (biblioteka)</td><td>wynik orientacyjny, nie służy do łączenia</td></tr>
+    <tr><td>facetorch: EfficientNet B2 (emocje, HSEmotion)</td><td>analiza twarzy (pomocniczo)</td><td>HSE-asavchenko</td><td>Apache 2.0</td><td>–</td></tr>
+    <tr><td>Tesseract OCR + pol, eng</td><td>OCR zrzutów i klatek</td><td>tesseract-ocr</td><td>Apache 2.0</td><td>–</td></tr>
+  </tbody>
+</table>
+<p>Modele pobierają się przy pierwszym starcie do wolumenu Dockera <code>models</code> (usługa <code>init</code>) z oficjalnych źródeł; skrypt <code>scripts/image/pobierz_modele_obrazu.py</code> sprawdza sumy SHA-256 pobranych plików.</p>
+</section>
+
+<section>
+<p class="kicker"><b>03</b> / Biblioteki Pythona</p>
+<h2><span class="red">requirements.txt</span>, constraints.txt</h2>
+<table class="libs">
+  <thead><tr><th style="width:26%">Biblioteka</th><th style="width:24%">Licencja</th><th style="width:26%">Biblioteka</th><th>Licencja</th></tr></thead>
+  <tbody>
+    <tr><td>PyTorch, torchvision</td><td>BSD-3-Clause</td><td>torchaudio</td><td>BSD-2-Clause</td></tr>
+    <tr><td>numpy, pandas, scipy*, scikit-learn*</td><td>BSD-3-Clause</td><td>numba*</td><td>BSD-2-Clause</td></tr>
+    <tr><td>transformers, sentence-transformers</td><td>Apache 2.0</td><td>huggingface_hub*</td><td>Apache 2.0</td></tr>
+    <tr><td>open_clip_torch</td><td>MIT</td><td>timm*</td><td>Apache 2.0</td></tr>
+    <tr><td>insightface (kod)</td><td>MIT</td><td>onnxruntime</td><td>MIT</td></tr>
+    <tr><td>facetorch</td><td>Apache 2.0</td><td>opencv-python-headless</td><td>Apache 2.0 (OpenCV), MIT (pakiet)</td></tr>
+    <tr><td>ImageHash</td><td>BSD-2-Clause</td><td>Pillow</td><td>MIT-CMU (HPND)</td></tr>
+    <tr><td>pillow-heif</td><td>BSD-3-Clause (libheif: LGPL-3.0)</td><td>scikit-image*</td><td>BSD-3-Clause</td></tr>
+    <tr><td>albumentations*</td><td>MIT</td><td>pytesseract</td><td>Apache 2.0</td></tr>
+    <tr><td>speechbrain</td><td>Apache 2.0</td><td>soundfile</td><td>BSD-3-Clause</td></tr>
+    <tr><td>librosa</td><td>ISC</td><td>httpx</td><td>BSD-3-Clause</td></tr>
+    <tr><td>playwright (+ Chromium)</td><td>Apache 2.0 (Chromium: BSD-3 i inne)</td><td>beautifulsoup4</td><td>MIT</td></tr>
+    <tr><td>lxml</td><td>BSD-3-Clause</td><td>tldextract</td><td>BSD-3-Clause</td></tr>
+    <tr><td>dnspython</td><td>ISC</td><td>python-whois</td><td>MIT</td></tr>
+    <tr><td>ipwhois</td><td>BSD-2-Clause</td><td>cryptography</td><td>Apache 2.0 / BSD</td></tr>
+    <tr><td>mmh3</td><td>MIT</td><td>apscheduler</td><td>MIT</td></tr>
+    <tr><td>fastapi</td><td>MIT</td><td>uvicorn</td><td>BSD-3-Clause</td></tr>
+    <tr><td>python-multipart</td><td>Apache 2.0</td><td>pydantic*</td><td>MIT</td></tr>
+    <tr><td>psycopg 3</td><td>LGPL-3.0</td><td>pgvector (Python)</td><td>MIT</td></tr>
+    <tr><td>neo4j (sterownik)</td><td>Apache 2.0</td><td>python-dotenv</td><td>BSD-3-Clause</td></tr>
+    <tr><td>tqdm</td><td>MPL-2.0 / MIT</td><td>matplotlib</td><td>licencja Matplotlib (PSF-podobna)</td></tr>
+    <tr><td>jupyterlab, ipywidgets</td><td>BSD-3-Clause</td><td>pytest</td><td>MIT</td></tr>
+  </tbody>
+</table>
+<p class="muted">* zależność pośrednia – instalowana przez inne pakiety (np. facetorch, librosa, fastapi), wersja przypięta w <code>constraints.txt</code> albo wybrana przez pip.</p>
+<p>psycopg 3 (LGPL-3.0) i libheif (LGPL-3.0) są używane jako niezmienione biblioteki dynamiczne, co jest zgodne z LGPL także w projektach o innej licencji.</p>
+</section>
+
+<section>
+<p class="kicker"><b>04</b> / Front i fonty</p>
+<h2>front/package.json</h2>
+<table>
+  <thead><tr><th style="width:42%">Biblioteka</th><th>Licencja</th></tr></thead>
+  <tbody>
+    <tr><td>React, React DOM</td><td>MIT</td></tr>
+    <tr><td>react-force-graph-2d / -3d</td><td>MIT</td></tr>
+    <tr><td>three, three-spritetext</td><td>MIT</td></tr>
+    <tr><td>d3-force</td><td>ISC</td></tr>
+    <tr><td>roughjs</td><td>MIT</td></tr>
+    <tr><td>Vite, @vitejs/plugin-react</td><td>MIT</td></tr>
+    <tr><td>fonty Gloria Hallelujah, Patrick Hand (front)</td><td>SIL Open Font License 1.1 (<code>front/src/assets/fonts/LICENSE.txt</code>)</td></tr>
+    <tr><td>fonty Inter, Inter Tight, Caveat (dokumentacja i prezentacja)</td><td>SIL Open Font License 1.1</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>05</b> / Infrastruktura</p>
+<h2>Obrazy <span class="red">Dockera</span></h2>
+<table>
+  <thead><tr><th style="width:30%">Komponent</th><th style="width:30%">Licencja</th><th>Uwagi</th></tr></thead>
+  <tbody>
+    <tr><td>Python 3.11 (python:3.11-slim)</td><td>PSF</td><td>–</td></tr>
+    <tr><td>PostgreSQL 16 + pgvector (pgvector/pgvector:pg16)</td><td>PostgreSQL License</td><td>–</td></tr>
+    <tr><td>Neo4j 5 Community + APOC</td><td>GPL-3.0 (Neo4j CE), Apache 2.0 (APOC)</td><td>Neo4j to tylko kopia grafu do przeglądania; system działa bez niego</td></tr>
+    <tr><td>Caddy 2</td><td>Apache 2.0</td><td>serwer frontu, HTTPS na serwerze</td></tr>
+    <tr><td>Node.js 22 (build frontu)</td><td>MIT</td><td>tylko na etapie budowania</td></tr>
+    <tr><td>FFmpeg (pakiet Debiana)</td><td>LGPL-2.1 / GPL-2.0 (zależnie od opcji kompilacji)</td><td>wywoływany jako osobny program</td></tr>
+    <tr><td>whois, dnsutils</td><td>GPL-2.0 / MPL-2.0</td><td>wywoływane jako osobne programy</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>06</b> / Usługi zewnętrzne</p>
+<h2>Źródła danych <span class="red">i dostęp</span></h2>
+<table>
+  <thead><tr><th style="width:21%">Usługa</th><th style="width:20%">Do czego</th><th style="width:29%">Dostęp</th><th>Ograniczenia</th></tr></thead>
+  <tbody>
+    <tr><td>Meta Ad Library API (<code>graph.facebook.com/…/ads_archive</code>)</td><td>skaner reklam (<code>adlib</code>)</td><td>token użytkownika z dostępem do Ad Library API (<code>META_ACCESS_TOKEN</code> w <code>.env</code>) – kroki: facebook.com/ads/library/api</td><td>warunki Meta Platform; limity wywołań (skaner pilnuje nagłówka <code>x-business-use-case-usage</code>)</td></tr>
+    <tr><td>Lista Ostrzeżeń CERT Polska (hole.cert.pl)</td><td>sygnał filtra skanera (domena na liście)</td><td>publiczna, bez klucza</td><td>odświeżana raz na dobę</td></tr>
+    <tr><td>DNS (publiczne resolwery)</td><td>rekordy A/NS/MX/TXT/SOA</td><td>bez klucza</td><td>–</td></tr>
+    <tr><td>RDAP / WHOIS (rejestry domen i IP)</td><td>wiek domeny, rejestrator, ASN</td><td>bez klucza</td><td>limity zapytań rejestrów</td></tr>
+    <tr><td>crt.sh (Certificate Transparency)</td><td>domeny z tego samego certyfikatu</td><td>bez klucza</td><td>serwis bywa przeciążony – brak odpowiedzi nie przerywa analizy</td></tr>
+    <tr><td>Hugging Face Hub, GitHub, Google Drive</td><td>jednorazowe pobranie modeli</td><td>bez klucza</td><td>wymagane przy pierwszym starcie</td></tr>
+    <tr><td>strony z reklam (Playwright)</td><td>pobranie strony docelowej</td><td>–</td><td>otwierane wyłącznie w kontenerze; antywirus hosta może je blokować</td></tr>
+  </tbody>
+</table>
+<p>Bez tokenu Meta system działa w pełni poza skanerem Biblioteki Reklam (usługa <code>scheduler</code> zapisuje wtedy błąd skanu). <strong>Weryfikacja działania podczas oceny nie wymaga żadnego klucza</strong> – także w wersji online (tetracore.pl).</p>
+</section>
+
+<section>
+<p class="kicker"><b>07</b> / Dane</p>
+<h2>Skąd i <span class="red">na jakich zasadach</span></h2>
+<table>
+  <thead><tr><th style="width:24%">Dane</th><th style="width:26%">Pochodzenie</th><th style="width:28%">Licencja / zasady</th><th>W repozytorium</th></tr></thead>
+  <tbody>
+    <tr><td>paczka przykładowych materiałów (<code>data/BACKUP</code>, <code>data/DANE</code>)</td><td>organizator (NASK)</td><td>wyłącznie na potrzeby wyzwania, zakaz publicznego rozpowszechniania</td><td>nie</td></tr>
+    <tr><td>baza referencyjna osób (<code>data/reference_people</code>)</td><td>Wikimedia Commons (CC0, CC BY 4.0 – autorzy w <code>zrodla.json</code>) oraz zdjęcia o nieustalonej licencji (tylko lokalnie)</td><td>zgodnie z licencją każdego zdjęcia</td><td>nie</td></tr>
+    <tr><td>etykiety ewaluacji (<code>data/labels.csv</code>)</td><td>opracowanie zespołu na podstawie paczki</td><td>–</td><td>nie (odwołują się do plików paczki)</td></tr>
+    <tr><td>słowniki osób, marek, stop-słów (<code>features/text/lexicons</code>)</td><td>opracowanie zespołu</td><td>jak kod projektu</td><td>tak</td></tr>
+    <tr><td>reklamy z Biblioteki Reklam Meta</td><td>Meta Ad Library</td><td>warunki Meta</td><td>nie (tylko w bazie lokalnej)</td></tr>
+  </tbody>
+</table>
+</section>
+</body></html>

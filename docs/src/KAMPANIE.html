@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pl"><head><meta charset="utf-8"><title>Znalezione kampanie i wzorce</title>
+<link rel="stylesheet" href="style.css">
+<style>@page { @bottom-left { content: "TETRA · Znalezione kampanie i wzorce"; } }</style>
+</head><body>
+
+<div class="cover">
+  <img class="cat" src="img/kot.png" alt="">
+  <p class="brand">TETRA</p>
+  <p class="sub">FAKE-TRACE</p>
+  <h1 class="title">Znalezione kampanie i wzorce</h1>
+  <p class="lead">kampanie i operatorzy w paczce NASK oraz przydatne źródła metadanych</p>
+  <div class="toc">
+    <div class="label">Spis treści</div>
+    <ol>
+      <li><b>01</b>Podsumowanie</li><li><b>02</b>Operator A – fałszywe artykuły</li>
+      <li><b>03</b>Operator B – suplementy i leki</li><li><b>04</b>Pojedyncze wzorce</li>
+      <li><b>05</b>Reklamy ze skanera Biblioteki</li><li><b>06</b>Przydatne źródła metadanych</li>
+    </ol>
+  </div>
+  <div class="meta"><span><b>HackNation 2026</b> · wyzwanie NASK „Follow the fake”</span><span>Dokumentacja projektu · 22.11.2026</span></div>
+</div>
+
+<p class="intro">Opis kampanii, które system odtworzył na przykładowej paczce NASK (25 przypadków: <code>BACKUP/p1–p15</code> i 10 folderów <code>DANE</code>), oraz przydatnych źródeł metadanych. To rezultat, o który organizator prosi w punkcie 10 treści zadania: opis zidentyfikowanych wzorców kampanii oszukańczych, metodyka łączenia cech, wskazanie użytecznych źródeł metadanych.</p>
+<div class="note"><span class="hand">wskaźniki z materiałów organizatora</span>
+<p>Dokument zawiera wskaźniki (domeny, identyfikatory pikseli, hosty) wyciągnięte z paczki NASK. Same materiały nie są publikowane.</p></div>
+
+<section>
+<p class="kicker"><b>01</b> / Podsumowanie</p>
+<h2>25 materiałów, <span class="red">18 kampanii, 2 operatorów</span></h2>
+<div class="stats" style="--n:5">
+  <div class="stat"><b>25</b><span>materiałów z paczki</span></div>
+  <div class="stat"><b>3</b><span>kampanie z ≥ 2 materiałami</span></div>
+  <div class="stat"><b>15</b><span>kampanii jednoelementowych („nowe wzorce”)</span></div>
+  <div class="stat"><b>2</b><span>operatorów (wspólna infrastruktura)</span></div>
+  <div class="stat"><b>17 / 1001</b><span>reklam z Biblioteki przeanalizowanych (skan 22.11.2026)</span></div>
+</div>
+<figure><img src="img/operatorzy.png" alt="Dwóch operatorów: A z siedmioma kampaniami, B z czterema, oraz siedem pojedynczych wzorców"></figure>
+<p class="muted">Kampanie z ≥ 2 materiałami: Brzoska – 6, Stanowski/Sekielski – 2, Nawrocki/Sikorski – 2.</p>
+</section>
+
+<section>
+<p class="kicker"><b>02</b> / Operator A</p>
+<h2>Fałszywe artykuły <span class="red">z celebrytami</span> <span class="muted">· 7 kampanii</span></h2>
+<p>Wspólne dla wszystkich kampanii tego operatora (przesłanki OSINT i obrazu z systemu):</p>
+<ul>
+  <li>ten sam <strong>Pixel Meta</strong> <code>4567646436826205</code>,</li>
+  <li>ten sam zewnętrzny <strong>host aktora</strong> na AWS (<code>xd-f1cf3d4f…dcb.ecs.us-east-1.on.aws</code>) i ten sam adres IP poza CDN,</li>
+  <li>ta sama <strong>rodzina kitu</strong>: zasoby pod ścieżką <code>/_cdn/production/landing-cdn/</code>, ten sam szablon endpointu <code>POST /api/v1/agent/persist-session-record/{uuid}/{uuid}</code>, identyczne (po normalizacji) własne skrypty JS,</li>
+  <li>wspólne grafiki stron (te same zdjęcia w różnych artykułach),</li>
+  <li>ten sam schemat adresu wejścia: losowe wartości <code>utm_id</code>, <code>utm_medium</code>, <code>utm_campaign</code>, <code>utm_content</code>, <code>utm_visit</code> (generator TDS),</li>
+  <li>strony podszywają się pod media (klony Gazeta.pl, Wyborcza.pl, TVN24), a narracja to zawsze „znana osoba ujawnia sposób na zarabianie” albo „skandal/atak po ujawnieniu tajemnicy banków”; część artykułów ma tego samego fałszywego autora („oprac. Natalia Pacholczyk”).</li>
+</ul>
+<table>
+  <thead><tr><th style="width:22%">Kampania</th><th style="width:15%">Materiały</th><th style="width:24%">Domeny</th><th>Narracja i znaki szczególne</th></tr></thead>
+  <tbody>
+    <tr><td>„Wiem, kto strzelał” – zamach na Rafała Brzoskę</td><td>p1, p2, p7, p15, DANE/1, DANE/2</td><td>dorquesio.click, wernulio.live, lundevra.live, civicdaybook.live, acrosscommunities.live, healthlinkq.pro</td><td>identyczny klon artykułu Gazeta.pl na 6 domenach; w tekście M. Morawiecki; presja: zysk, tajemnica, presja czasu, autorytet, „wszyscy już zarabiają”; podszywane marki: InPost, BLIK, KNF, PKO BP, Pekao, ING, Santander, mBank, Revolut, Polsat; kwoty 1000–1390 zł</td></tr>
+    <tr><td>„Brutalna napaść po publikacji śledztwa w sprawie banków”</td><td>p3 (K. Stanowski), p4 (T. Sekielski)</td><td>falmurek.live, grentavo.click</td><td>ten sam artykuł z podmienionym nazwiskiem (system łączy go przez szkielet tekstu); w tle A. Glapiński</td></tr>
+    <tr><td>„FinNews – Trudna odpowiedź”</td><td>p8 (K. Nawrocki), p11 (R. Sikorski)</td><td>spiritualityinsports.org, sfuxd.com</td><td>szablon „bloga finansowego” z polityczną wypowiedzią i podmienionym politykiem</td></tr>
+    <tr><td>„Sam pan sobie podniósł premię!” – M. Olejnik</td><td>p5</td><td>smartcoved.pro</td><td>klon Gazeta.pl, fałszywy autor; host aktora <code>crimsonbase.pro</code>, endpoint <code>GET /click?event{n}&amp;upd_clickid</code></td></tr>
+    <tr><td>„Próbowali mnie zniszczyć” – atak na samochód M. Olejnik</td><td>DANE/3</td><td>healthlinkq.pro</td><td>klon TVN24; ta sama domena co druga strona w DANE/2 (kampania Brzoski) – dowód rotacji stron w obrębie operatora</td></tr>
+    <tr><td>„37 minut po emisji wyprowadzono go w kajdankach” – T. Lis</td><td>DANE/48</td><td>novumfy.com</td><td>ten sam fałszywy autor co p5; ta sama twarz (M. Morawiecki) w grafikach</td></tr>
+    <tr><td>Glowpixel.org – „portal analiz produkcji medialnej”</td><td>DANE/61</td><td>glowpixel.org</td><td>strona-przykrywka (white page) – ten sam kit i wspólne grafiki z artykułami operatora</td></tr>
+  </tbody>
+</table>
+<div class="note ink"><span class="hand">wzorzec</span>
+<p>Jedna infrastruktura i jeden kit, wiele narracji i nazwisk; domeny zmieniane co kilka dni (6 domen jednej kampanii). Łączenie po domenie wykrywa tylko kopie z tej samej strony – kampanię skleja szkielet tekstu i kreacje, a operatora piksel, host aktora i kit.</p></div>
+</section>
+
+<section>
+<p class="kicker"><b>03</b> / Operator B</p>
+<h2>Suplementy <span class="red">i cudowne leki</span> <span class="muted">· 4 kampanie</span></h2>
+<table>
+  <thead><tr><th style="width:17%">Kampania</th><th style="width:11%">Materiał</th><th style="width:20%">Domena</th><th>Narracja</th></tr></thead>
+  <tbody>
+    <tr><td>Kardivix</td><td>p10</td><td>move-fitlum.top</td><td>„pozbądź się nadciśnienia w domu, bez leków”, film „może zostać usunięty”</td></tr>
+    <tr><td>Metabo RX</td><td>DANE/14</td><td>ineptsolidoval.top</td><td>„idealna sylwetka w 27 dni”, wideo z komentarzami</td></tr>
+    <tr><td>Uromexil Forte</td><td>DANE/47</td><td>shryxla-mynx.icu</td><td>„prostatyt zabija niepostrzeżenie”, wideo z komentarzami</td></tr>
+    <tr><td>Cactus Recipe</td><td>p9</td><td>door-focus.com</td><td>formularz zamówienia „-50%, zostało 35 sztuk”; nazwa produktu inna niż treść (zestaw reklam „PL Hearing”)</td></tr>
+  </tbody>
+</table>
+<p><strong>Wspólne:</strong> ta sama infrastruktura kitu wykryta przez OSINT, szablon „wideo + fałszywe komentarze + licznik zapasów”, krótkie losowe ścieżki adresu (8 znaków, np. <code>/tzqfBFsC</code>) i parametry reklam Meta w adresie (<code>ad_id</code>, <code>adset_name</code>, <code>utm_placement</code>).</p>
+<p><strong>Hipoteza do sprawdzenia:</strong> p13 („Polka zdradza sekret pozbycia się grzybicy”, zenithlab.ink) ma ten sam kształt adresu, ale system nie znalazł wystarczających wspólnych śladów, więc zostawił go jako osobny wzorzec.</p>
+</section>
+
+<section>
+<p class="kicker"><b>04</b> / Pojedyncze wzorce</p>
+<h2>Bez podobnych <span class="red">w paczce</span></h2>
+<table>
+  <thead><tr><th style="width:14%">Materiał</th><th>Opis</th></tr></thead>
+  <tbody>
+    <tr><td>DANE/5</td><td>reklama wideo z Biblioteki Reklam: „lekarz” o bólu kręgosłupa; ocena deepfake twarzy 96% (orientacyjnie)</td></tr>
+    <tr><td>DANE/10</td><td>fałszywa strona App Store „Słodka Bonanza” z wizerunkiem Cristiano Ronaldo – hazard</td></tr>
+    <tr><td>DANE/36</td><td>„Poland Invest Summit 2026” – fałszywa konferencja inwestycyjna, ruch z Facebooka (<code>utm_source=fb</code>)</td></tr>
+    <tr><td>p14</td><td>anglojęzyczna „Financial Miracle” z motywem religijnym (abundancecaller.com)</td></tr>
+    <tr><td>p6</td><td>„pierwsze oznaki cukrzycy – rozmowa z ojcem z Jasnej Góry” (w paczce tylko zasoby strony, bez HTML)</td></tr>
+    <tr><td>p12</td><td>RelieFlex – suplement na stawy (zasoby strony i zrzut, bez HTML)</td></tr>
+    <tr><td>p13</td><td>grzybica – „Dr. Merritz Multi za 0 zł” (patrz hipoteza wyżej)</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section>
+<p class="kicker"><b>05</b> / Reklamy ze skanera</p>
+<h2>Biblioteka Reklam Meta <span class="red">na żywo</span></h2>
+<div class="stats" style="--n:3">
+  <div class="stat"><b>1001</b><span>reklam w skanie 22.11.2026</span></div>
+  <div class="stat"><b>984</b><span>odrzuconych przez filtr wstępny</span></div>
+  <div class="stat"><b>17</b><span>przeanalizowanych przez cały potok</span></div>
+</div>
+<p>Wszystkie 17 to reklamy strony „Golden Flowers Poland – Kwiatomat 24/7” prowadzące na wiele domen o niemal identycznych nazwach (<code>goldenflowerspoland.pl</code>, <code>goldenfiowerspoland.pl</code>, <code>biuroggoldenflowerspoland.pl</code>, <code>rebizantegoldenflowerspoland.pl</code>…). System połączył 4 z nich po tekście i obrazie, 2 oznaczył do weryfikacji, resztę zostawił jako osobne wzorce.</p>
+<p>To sygnał do weryfikacji przez analityka, a nie stwierdzenie oszustwa: wynik filtra (0,51–0,56) był tuż nad progiem. Wzorzec pokazał też lukę: system nie porównuje jeszcze podobieństwa nazw domen (typosquatting) – patrz METODYKA.pdf, sekcja 12.</p>
+</section>
+
+<section>
+<p class="kicker"><b>06</b> / Źródła metadanych</p>
+<h2>Co najbardziej pomaga <span class="red">łączyć</span></h2>
+<p>Uszeregowane według przydatności do łączenia na tej paczce:</p>
+<table>
+  <thead><tr><th style="width:24%">Źródło</th><th>Co daje</th><th style="width:25%">Gdzie w systemie</th></tr></thead>
+  <tbody>
+    <tr><td>HAR (zapis ruchu strony)</td><td>piksele i konta analityki, hosty aktora, endpointy kitu, łańcuch przekierowań, certyfikat</td><td><code>features/osint</code></td></tr>
+    <tr><td>HTML strony</td><td>tekst i szkielet artykułu, osoby, marki, kwoty, fałszywy autor, skrypty i style kitu</td><td><code>features/text</code>, <code>features/osint</code></td></tr>
+    <tr><td>parametry adresu wejścia</td><td>schemat TDS (<code>utm_*</code>), parametry reklam Meta (<code>ad_id</code>, <code>adset_name</code>), identyfikatory kampanii</td><td><code>features/osint</code> (<code>url_param_schema</code>, <code>fb_ad_object</code>)</td></tr>
+    <tr><td>kreacje i grafiki strony</td><td>identyczne pliki, ten sam kadr, ta sama twarz</td><td><code>features/image</code></td></tr>
+    <tr><td>nagranie reklamy</td><td>ta sama ścieżka dźwiękowa i ujęcia mimo przycięcia; głos lektora; transkrypcja</td><td><code>features/av</code></td></tr>
+    <tr><td>RDAP/WHOIS, DNS, Certificate Transparency</td><td>wiek domeny, rejestrator, partie rejestracji, wspólne certyfikaty, oznaki zdjęcia strony</td><td><code>features/osint/enrich.py</code></td></tr>
+    <tr><td>Meta Ad Library API</td><td>strona-reklamodawca, płatnik, daty emisji, treść reklamy, zdjęcie reklamy przez Metę</td><td><code>adlib</code></td></tr>
+    <tr><td>Lista Ostrzeżeń CERT Polska</td><td>czy domena jest już znana jako niebezpieczna</td><td><code>adlib</code> (filtr wstępny)</td></tr>
+    <tr><td>zrzut ekranu</td><td>OCR tekstu i adresu, obraz do porównań – gdy strona już nie działa</td><td><code>ingest</code>, <code>features/image</code></td></tr>
+  </tbody>
+</table>
+<div class="two">
+  <div class="note"><span class="hand">najsilniejsze wskaźniki operatora</span><p>Pixel Meta / GA4 / GTM, token weryfikacji domeny Meta, katalog wdrożenia kitu, host aktora, certyfikat TLS.</p></div>
+  <div class="note ink"><span class="hand">najsilniejsze wskaźniki kampanii</span><p>Szkielet tekstu (odporny na podmianę nazwiska i domeny), identyczne kreacje, odcisk dźwięku nagrania.</p></div>
+</div>
+</section>
+</body></html>

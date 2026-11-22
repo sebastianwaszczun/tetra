@@ -1,0 +1,89 @@
+/* Dokumentacja TETRA – ten sam styl co prezentacja: krem, czerń, czerwień, Inter Tight + Inter + Caveat. */
+@font-face { font-family: "Inter"; src: url(fonts/Inter.ttf); font-weight: 100 900; }
+@font-face { font-family: "Inter Tight"; src: url(fonts/InterTight.ttf); font-weight: 100 900; }
+@font-face { font-family: "Caveat"; src: url(fonts/Caveat.ttf); font-weight: 400 700; }
+
+@page {
+  size: A4;
+  margin: 17mm 17mm 19mm;
+  background: #F3EBDC;
+  @bottom-left { content: "TETRA · FAKE-TRACE"; font: 400 7.5pt "Inter"; color: #6B635A; }
+  @bottom-right { content: counter(page) " / " counter(pages); font: 700 7.5pt "Inter Tight"; color: #141210; }
+}
+@page :first { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; font: 400 9.4pt/1.5 "Inter", sans-serif; color: #141210; background: #F3EBDC; }
+
+/* ---------- okładka (jak slajd tytułowy) ---------- */
+.cover { height: 297mm; box-sizing: border-box; padding: 22mm 20mm 18mm; position: relative; break-after: page; }
+.cover .brand { font: 900 66pt/0.9 "Inter Tight"; letter-spacing: -0.055em; color: #C9302B; margin: 0; }
+.cover .sub { font: 800 13pt "Inter Tight"; letter-spacing: -0.01em; margin: 3mm 0 0; }
+.cover .title { font: 800 40pt/1.02 "Inter Tight"; letter-spacing: -0.045em; margin: 62mm 0 0; max-width: 150mm; }
+.cover .lead { font: 800 17pt/1.15 "Inter Tight"; letter-spacing: -0.025em; color: #C9302B; margin: 4mm 0 0; max-width: 140mm; }
+.cover .cat { position: absolute; right: 18mm; top: 20mm; width: 36mm; }
+.cover .meta { position: absolute; left: 20mm; right: 20mm; bottom: 16mm; display: flex; justify-content: space-between;
+  font: 400 8pt "Inter"; color: #6B635A; border-top: 1pt solid #A89E90; padding-top: 3mm; }
+.cover .meta b { font-family: "Inter Tight"; color: #141210; }
+.toc { position: absolute; left: 20mm; right: 20mm; bottom: 30mm; }
+.toc .label { font: 800 8pt "Inter Tight"; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2mm; }
+.toc ol { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 10mm; }
+.toc li { font: 500 9pt/1.9 "Inter"; border-bottom: .6pt solid #A89E90; break-inside: avoid; }
+.toc li b { display: inline-block; width: 8mm; color: #C9302B; font: 800 9pt "Inter Tight"; }
+
+/* ---------- treść ---------- */
+section { break-before: auto; }
+.kicker { font: 800 7.8pt "Inter Tight"; text-transform: uppercase; letter-spacing: .03em; color: #6B635A; margin: 9mm 0 0; break-after: avoid; }
+.kicker b { color: #C9302B; }
+h2 { font: 800 23pt/1.02 "Inter Tight"; letter-spacing: -0.04em; margin: 1mm 0 3.5mm; break-after: avoid; }
+h2 .red { color: #C9302B; }
+h3 { font: 800 11.5pt "Inter Tight"; letter-spacing: -0.015em; margin: 5mm 0 1.5mm; break-after: avoid; }
+p { margin: 0 0 2.4mm; }
+ul, ol { margin: 0 0 2.6mm; padding-left: 5mm; }
+li { margin-bottom: 1mm; }
+li::marker { color: #C9302B; font-weight: 700; }
+strong { font-weight: 700; }
+.intro { font: 500 10.5pt/1.45 "Inter"; margin: 0 0 3mm; }
+.muted { color: #6B635A; }
+.red { color: #C9302B; }
+.hand { font: 700 13pt/1.1 "Caveat"; color: #C9302B; }
+a { color: inherit; text-decoration-color: #C9302B; text-underline-offset: 2px; }
+
+code { font: 400 0.88em "DejaVu Sans Mono", monospace; background: rgba(20,18,16,.07); padding: 0 .3em; border-radius: 3px; }
+pre { background: #141210; color: #F3EBDC; font: 400 8pt/1.6 "DejaVu Sans Mono", monospace; padding: 3.2mm 4mm; margin: 1mm 0 3.2mm;
+  border-radius: 3px 10px 4px 12px / 10px 4px 12px 3px; white-space: pre-wrap; break-inside: avoid; }
+pre code { background: none; padding: 0; color: inherit; }
+pre .c { color: #A89E90; }
+
+/* tabele jak na slajdzie SCHEDULDER */
+table { width: 100%; border-collapse: collapse; margin: 1.5mm 0 3.5mm; font-size: 8.7pt; line-height: 1.42; }
+thead th { text-align: left; font: 700 8.3pt "Inter"; color: #141210; padding: 0 3mm 1.6mm 0; border-bottom: 1pt solid #141210; vertical-align: bottom; }
+td { padding: 1.5mm 3mm 1.5mm 0; border-bottom: .7pt solid #A89E90; vertical-align: top; }
+tr { break-inside: avoid; }
+td:first-child { font-weight: 700; color: #C9302B; }
+table.plain td:first-child { font-weight: 400; color: inherit; }
+td.num, th.num { text-align: right; white-space: nowrap; }
+td.k { font-weight: 700; color: #141210; }
+
+/* ramka rysowana ręcznie */
+.note { border: 1.5pt solid #C9302B; border-radius: 255px 14px 225px 16px / 14px 225px 16px 255px; padding: 3mm 4.5mm 2.4mm;
+  margin: 3mm 0 4mm; break-inside: avoid; }
+.note.ink { border-color: #141210; }
+.note .hand { display: block; margin-bottom: 1mm; font-size: 15pt; }
+.note p:last-child, .note ul:last-child, .note ol:last-child { margin-bottom: 0; }
+
+/* liczby jak w prezentacji */
+.stats { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 5mm; margin: 3mm 0 5mm; break-inside: avoid; }
+.stat { border-top: 1pt solid #A89E90; padding-top: 1.8mm; }
+.stat b { display: block; font: 800 20pt/1.1 "Inter Tight"; letter-spacing: -0.035em; }
+.stat span { display: block; font: 400 8pt/1.35 "Inter"; color: #6B635A; margin-top: .6mm; }
+
+figure { margin: 2mm 0 4mm; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figcaption { font: 700 12pt "Caveat"; color: #6B635A; margin-top: 1mm; }
+.formula { display: grid; grid-template-columns: 66mm 1fr; align-items: center; gap: 4mm; margin: 1mm 0 2mm;
+  font: 800 15pt "Inter Tight"; letter-spacing: -0.02em; }
+.formula small { font: 400 8.3pt/1.35 "Inter"; color: #6B635A; letter-spacing: 0; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 7mm; }
+.keep { break-inside: avoid; }
+.pb { break-before: page; }

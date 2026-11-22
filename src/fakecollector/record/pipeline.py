@@ -32,7 +32,7 @@ def _run(results: ModuleResults, name: str, fn):
     t0 = time.time()
     try:
         return fn()
-    except Exception as exc:  # noqa: BLE001 – moduł nie może zabrać wyniku pozostałych
+    except Exception as exc:  # noqa: BLE001
         log.exception("Moduł %s", name)
         results.errors[name] = f"{exc.__class__.__name__}: {exc}"
         return None
@@ -69,14 +69,13 @@ def analyze_incident(inc: Any, *, text: bool = True, osint: bool = True, enrich:
         def _osint():
             rec = run_osint(inc, enrich=enrich)
             if rec is None and inc.errors and "OSINT" in inc.errors[-1]:
-                raise RuntimeError(inc.errors.pop())    # błąd zapisujemy raz – w wyniku modułu
+                raise RuntimeError(inc.errors.pop())
             return rec
         r.osint = _run(r, "osint", _osint)
     elif osint:
         r.skipped["osint"] = "brak adresu, HAR-a i strony"
 
     if image and inc.for_module("image"):
-        # adapter kolegi z modułu obrazu (features/image/potok.py); wektory potrzebne do bazy
         from fakecollector.features.image import potok
         r.image = _run(r, "image", lambda: potok.extract(inc, wektory=True))
     elif image:

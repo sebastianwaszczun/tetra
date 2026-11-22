@@ -40,12 +40,12 @@ class Pair:
     a: str
     b: str
     duplicate: bool = False
-    contrib: dict[str, float] = field(default_factory=dict)        # wkład modułu do kampanii
-    op_contrib: dict[str, float] = field(default_factory=dict)     # wkład do „ten sam operator”
+    contrib: dict[str, float] = field(default_factory=dict)
+    op_contrib: dict[str, float] = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
 
     def score(self, use: frozenset[str]) -> float:
-        if self.duplicate:                       # duplikat wykrywa preprocessing, nie moduły
+        if self.duplicate:
             return 1.0
         ws = [w for m, w in self.contrib.items() if m in use]
         return round(1 - math.prod(1 - min(w, 0.999) for w in ws), 3) if ws else 0.0
@@ -55,8 +55,6 @@ class Pair:
         ws = [w for m, w in self.op_contrib.items() if m in use]
         return round(1 - (1 - min(s, 0.999)) * math.prod(1 - min(w, 0.999) for w in ws), 3)
 
-
-# ============================================================================ dane
 
 def labeled_materials(labels: dict) -> tuple[dict[str, str], list[str], list[str]]:
     """id materiału -> source (pierwszy materiał z danego źródła), źródła bez materiału, materiały bez etykiety."""
@@ -104,8 +102,6 @@ def collect_pairs(ids: list[str], fresh: bool = False, progress: Callable | None
     return pairs
 
 
-# ============================================================================ ocena
-
 def _getter(pairs: dict[tuple, Pair], use: frozenset[str], level: str = "campaign") -> Callable[[str, str], float]:
     def s(a: str, b: str) -> float:
         p = pairs.get((a, b)) or pairs.get((b, a))
@@ -120,7 +116,6 @@ def evaluate(ids: list[str], gold: dict[str, str], s: Callable[[str, str], float
     pred = metrics.union_find(ids, lambda a, b: s(a, b) >= threshold)
     out: dict[str, Any] = {"pairs": metrics.summary(pred, gold)}
 
-    # 2. „wyjmij jeden”: materiał udaje nowy, reszta to już przetworzona baza
     known = {"total": 0, "correct": 0, "new_instead": 0, "wrong_campaign": 0}
     new = {"total": 0, "correct": 0, "merged": 0}
     loo_errors = []
@@ -150,7 +145,6 @@ def evaluate(ids: list[str], gold: dict[str, str], s: Callable[[str, str], float
     out["assign_known"] = {**known, "accuracy": round(known["correct"] / known["total"], 3) if known["total"] else None}
     out["assign_new"] = {**new, "accuracy": round(new["correct"] / new["total"], 3) if new["total"] else None}
 
-    # 3. „wyjmij kampanię”: cała kampania jest nowa – żaden jej materiał nie powinien się dokleić
     held = [c for c, k in Counter(gold.values()).items() if k >= 2]
     merged, total = 0, 0
     loco_errors = []
@@ -169,7 +163,7 @@ def evaluate(ids: list[str], gold: dict[str, str], s: Callable[[str, str], float
         fp, fn = [], []
         for a, b in combinations(ids, 2):
             same_pred, same_gold = pred[a] == pred[b], gold[a] == gold[b]
-            if same_pred and not same_gold:   # pośrednio = połączone łańcuchem przez inne materiały
+            if same_pred and not same_gold:
                 fp.append({"a": a, "b": b, "wynik": s(a, b), "posrednio": s(a, b) < threshold})
             elif same_gold and not same_pred:
                 fn.append({"a": a, "b": b, "wynik": s(a, b)})
@@ -208,7 +202,7 @@ def run(threshold: float | None = None, fresh: bool = False, labels_path: Path |
     for t in THRESHOLDS:
         r = evaluate(ids, gold, _getter(pairs, every), t)
         sweep.append({"threshold": t, **brief(r)})
-    present = Counter(m for p in pairs.values() for m in p.contrib)    # w ilu parach moduł miał dane
+    present = Counter(m for p in pairs.values() for m in p.contrib)
 
     op_gold = {i: labels[id_src[i]].operator for i in ids if labels[id_src[i]].operator}
     operator = None
@@ -217,7 +211,7 @@ def run(threshold: float | None = None, fresh: bool = False, labels_path: Path |
         pred = metrics.union_find(op_ids, lambda a, b: _getter(pairs, every, "operator")(a, b) >= threshold)
         operator = metrics.summary(pred, op_gold)
 
-    src = lambda i: id_src.get(i, i)  # noqa: E731 – w raporcie źródła zamiast id (czytelne dla człowieka)
+    src = lambda i: id_src.get(i, i)  # noqa: E731
     for e in main["errors"]["false_links"] + main["errors"]["missed_links"]:
         p = pairs.get((e["a"], e["b"])) or pairs.get((e["b"], e["a"]))
         e["przeslanki"] = p.reasons if p else []
@@ -255,8 +249,6 @@ def last_report() -> dict[str, Any] | None:
     f = EVAL_DIR / "raport.json"
     return json.loads(f.read_text(encoding="utf-8")) if f.is_file() else None
 
-
-# ============================================================================ raport
 
 LABEL_PL = {"text": "tekst", "osint": "OSINT", "image": "obraz", "av": "audio i wideo"}
 

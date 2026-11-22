@@ -123,7 +123,6 @@ def _client_redirect(html: str, base: str):
         mm = _META_REFRESH.search(m.get("content") or "")
         if mm:
             return ("meta_refresh", urljoin(base, mm.group(1)))
-    # tylko krótkie strony-przekładki – w dużych landingach JS location bywa w handlerach kliknięć
     if len(html) < 6000:
         mm = _JS_REDIRECT.search(html)
         if mm:

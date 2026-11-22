@@ -18,14 +18,11 @@ from datetime import datetime
 
 from .utils import SHARED_ASNS, short_hash
 
-# kind -> (waga, scope, opis)
 WEIGHTS: dict[str, tuple[float, str, str]] = {
-    # identity
     "registered_domain":      (1.00, "identity", "ta sama domena (rejestrowalna)"),
     "landing_host":           (0.90, "identity", "ten sam host strony docelowej"),
     "fb_ad_id":               (1.00, "identity", "ten sam identyfikator reklamy Meta (parametr ad_id)"),
     "ad_archive_id":          (1.00, "identity", "ta sama reklama w Bibliotece Reklam"),
-    # operator
     "fb_pixel":               (0.95, "operator", "ten sam Pixel Meta"),
     "google_ads":             (0.95, "operator", "to samo konto konwersji Google Ads"),
     "ga4":                    (0.90, "operator", "ta sama usługa GA4"),
@@ -52,7 +49,6 @@ WEIGHTS: dict[str, tuple[float, str, str]] = {
     "crypto_wallet":          (1.00, "operator", "ten sam portfel kryptowalut"),
     "secret_param":           (0.90, "operator", "ten sam (zahashowany) token dostępowy w URL"),
     "registrant_org":         (0.80, "operator", "ten sam rejestrujący (gdy bez proxy prywatności)"),
-    # kit
     "kit_dir":                (0.90, "kit", "ten sam katalog wdrożenia kitu (np. landing-cdn/<uuid>)"),
     "kit_family":             (0.45, "kit", "ta sama platforma/rodzina kitu (prefiks ścieżek)"),
     "js_hash":                (0.85, "kit", "identyczny (po normalizacji) własny skrypt JS"),
@@ -67,7 +63,6 @@ WEIGHTS: dict[str, tuple[float, str, str]] = {
     "url_param_schema":       (0.50, "kit", "ten sam schemat parametrów URL (generator TDS)"),
     "path_layout":            (0.35, "kit", "ten sam układ katalogów (szablon ścieżek)"),
     "dom_simhash":            (0.50, "kit", "podobny szkielet DOM (simhash, Hamming ≤ 6)"),
-    # infra
     "ip":                     (0.60, "infra", "ten sam adres IP (poza współdzielonym CDN)"),
     "ip_cdn":                 (0.03, "infra", "ten sam adres IP współdzielonego CDN"),
     "cidr":                   (0.30, "infra", "ta sama sieć (CIDR) hostingu"),
@@ -86,7 +81,6 @@ WEIGHTS: dict[str, tuple[float, str, str]] = {
     "header_fingerprint":     (0.20, "infra", "ten sam zestaw nagłówków HTTP"),
     "cookie":                 (0.45, "infra", "to samo niestandardowe ciasteczko"),
     "csp_host":               (0.60, "infra", "ten sam host w polityce CSP"),
-    # behavior
     "tds_campaign":           (0.65, "operator", "ta sama kampania w TDS (np. Keitaro _trk/_camp_id/trafficsource/user_id)"),
     "tds_family":             (0.20, "behavior", "ta sama rodzina TDS/trackera (Keitaro, Binom…)"),
     "naming_script":          (0.10, "behavior", "cyrylica w nazewnictwie reklam (język operatora)"),
@@ -109,7 +103,6 @@ def build_pivots(rec: dict) -> list[dict]:
     add = P.append
     landing = rec.get("landing") or {}
 
-    # ---- identity
     for d in landing.get("registered_domains") or []:
         add(_p("registered_domain", d, "domena strony docelowej"))
     for h in landing.get("hosts") or []:
@@ -147,7 +140,6 @@ def build_pivots(rec: dict) -> list[dict]:
         if ad.get("page_id"):
             add(_p("fb_page_id", ad["page_id"], f"strona: {ad.get('page_name')}"))
 
-    # ---- operator: trackery, kontakty
     for t in rec.get("trackers") or []:
         if t["type"] in WEIGHTS:
             add(_p(t["type"], t["id"], f"źródło: {', '.join(t.get('sources', []))}"))
@@ -162,7 +154,6 @@ def build_pivots(rec: dict) -> list[dict]:
     for w in html.get("crypto_wallets") or []:
         add(_p("crypto_wallet", w))
 
-    # ---- kit
     assets = rec.get("assets") or {}
     for d in assets.get("kit_dirs") or []:
         add(_p("kit_dir", d, "katalog zasobów z identyfikatorem wdrożenia"))
@@ -178,7 +169,7 @@ def build_pivots(rec: dict) -> list[dict]:
         add(_p("inline_js_hash", h, "skrypt inline ≥200 znaków"))
     for im in assets.get("images") or []:
         size = im.get("size") or 0
-        if im.get("role") != "actor_third_party" and size >= 4096:   # małe ikonki (reakcje FB itp.) to szum
+        if im.get("role") != "actor_third_party" and size >= 4096:
             add(_p("image_hash", im["sha256"], f"{im.get('name', '')} ({size} B)",
                    weight=None if size >= 20_000 else 0.45))
     for e in rec.get("endpoints") or []:
@@ -207,7 +198,6 @@ def build_pivots(rec: dict) -> list[dict]:
     if html.get("dom_simhash") and (html.get("dom_tag_count") or 0) >= 50:
         add(_p("dom_simhash", html["dom_simhash"], f"{html.get('dom_tag_count')} tagów"))
 
-    # ---- infra
     for ip in rec.get("ips") or []:
         if ip.get("cdn") or (ip.get("asn") in SHARED_ASNS):
             add(_p("ip_cdn", ip["ip"], ip.get("asn_name") or ip.get("cdn") or ""))
@@ -227,7 +217,7 @@ def build_pivots(rec: dict) -> list[dict]:
         flags = set(d.get("status_flags") or [])
         down = bool(flags & {"likely_taken_down", "registrar_or_parking_ns", "sinkhole_ip", "nxdomain"})
         ns = rd.get("nameservers") or dns.get("ns") or []
-        if ns and not down:          # NS zawieszonej domeny = NS rejestratora, nie aktora
+        if ns and not down:
             add(_p("ns_set", ",".join(sorted(ns)), d["domain"]))
         for mx in dns.get("mx") or []:
             if not any(x in mx for x in ("google.com", "outlook.com", "mail.protection", "zoho", "yandex")):
@@ -273,7 +263,6 @@ def build_pivots(rec: dict) -> list[dict]:
     for h in http.get("csp_hosts") or []:
         add(_p("csp_host", h))
 
-    # ---- behavior
     traits = rec.get("kit_traits") or []
     for t in traits:
         add(_p("kit_trait", t))
@@ -287,7 +276,6 @@ def build_pivots(rec: dict) -> list[dict]:
     if html.get("lang"):
         add(_p("lang", html["lang"].lower()[:5]))
 
-    # deduplikacja (kind, value) – zachowujemy pierwszy dowód
     seen, out = set(), []
     for p in P:
         k = (p["kind"], p["value"])

@@ -53,7 +53,6 @@ def _wczytaj_predyktor(manifest: Path) -> Predyktor:
         pre = PredictorPreProcessor(transform, cpu, optimize_transform=False)
         return FacePredictor(PlikLokalny("", str(pliki[nazwa])), cpu, pre, post)
 
-    # Geometria, kolory i kolejność etykiet z konfiguracji wydania 0.6.2.
     deepfake = predyktor("deepfake.pt", 380, PostSigmoidBinary(None, cpu, False, ["Real", "Fake"]))
     fer = predyktor("fer.pt", 244, PostArgMax(None, cpu, False, list(ETYKIETY_EMOCJI), dim=1))
 

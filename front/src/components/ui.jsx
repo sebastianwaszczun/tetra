@@ -54,7 +54,6 @@ export function Score({ value, label }) {
   )
 }
 
-// Etykiety w obrysie; `max` ucina listę i pokazuje „+N”.
 export function Chips({ items, max = Infinity, tone = '' }) {
   if (!items?.length) return null
   return (

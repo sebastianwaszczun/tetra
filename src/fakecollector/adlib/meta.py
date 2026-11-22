@@ -18,7 +18,6 @@ from .model import FiltrTokenu, Zapytanie, bez_tokenu
 
 log = logging.getLogger(__name__)
 log.addFilter(FiltrTokenu())
-# httpx loguje pełne adresy zapytań, a token jest parametrem adresu.
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
 
@@ -178,7 +177,6 @@ class KlientMeta:
             return BladMeta("zle_zapytanie", tekst, kod, podkod)
         return BladMeta("inny", f"HTTP {r.status_code}: {tekst}", kod, podkod)
 
-    # ------------------------------------------------------------------ nagrania
     def _nagraj(self, klucz: str, nr: int, parametry: dict[str, Any], dane: dict[str, Any]) -> None:
         if not self.katalog:
             return
@@ -187,7 +185,6 @@ class KlientMeta:
                  "parametry": parametry, "odpowiedz": dane}
         tekst = bez_tokenu(json.dumps(zapis, ensure_ascii=False))
         if nr == 0:
-            # Dalsze strony starszego nagrania tego zapytania nie mogą się mieszać z nowym.
             for stary in self.katalog.glob(f"{klucz}_*.json"):
                 stary.unlink()
         (self.katalog / f"{klucz}_{nr:02d}.json").write_text(tekst, encoding="utf-8")

@@ -70,7 +70,7 @@ def decide(material_id: str, action: str, note: str = "") -> dict[str, Any]:
         from .campaigns import assign_material
         res = assign_material(material_id)
         if row[0] is not None and row[0] != res["campaign_id"]:
-            refresh_campaign(row[0])          # pusta kampania znika, pozostałym odświeża się opis
+            refresh_campaign(row[0])
             refresh_operators()
         return {"material_id": material_id, "decision": None, "campaign_id": res["campaign_id"],
                 "assignment": res["assignment"], "previous_campaign_id": row[0]}

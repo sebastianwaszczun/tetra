@@ -23,7 +23,6 @@ from .model import Brak, CechyObrazu, CosinusyParyTwarzy, Dowod, Prostokat, Twar
 from .opisy_twarzy import opisz_twarze
 from .wektor import cosinus
 
-# InsightFace importuje Albumentations, które domyślnie sprawdza aktualizacje przez sieć.
 os.environ["NO_ALBUMENTATIONS_UPDATE"] = "1"
 
 MODEL_TWARZY = {"buffalo_l": "InsightFace buffalo_l / ArcFace", "yunet_sface": "OpenCV YuNet / SFace"}
@@ -63,7 +62,6 @@ class _Buffalo:
         opcje.intra_op_num_threads = wspolne["watki_onnx"]
         opcje_detektora = ort.SessionOptions()
         opcje_detektora.intra_op_num_threads = wspolne["watki_onnx"]
-        # SCRFD deklaruje wyjście dla 640×640 mimo wejścia o zmiennym rozmiarze.
         opcje_detektora.log_severity_level = 3
         self.wersja = wersja
         self.blokada = Lock()
@@ -81,7 +79,6 @@ class _Buffalo:
 
     def wykryj(self, raster: Macierz) -> list[Detekcja]:
         h, w = raster.shape[:2]
-        # Głowy SCRFD działają na siatkach o kroku do 32 px.
         wejscie = ceil(w / 32) * 32, ceil(h / 32) * 32
         prostokaty, punkty = self.detektor.detect(raster, input_size=wejscie)
         if punkty is None:

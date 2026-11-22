@@ -1,10 +1,5 @@
 name: fakecollector
 
-# Cały system jedną komendą:   docker compose up -d
-#   front (GUI):   http://localhost:8080        API: http://localhost:8000/docs
-#   Neo4j:         http://localhost:7474        JupyterLab: http://localhost:8888 (token: fake)
-# Pierwszy start buduje obraz i pobiera modele (20–40 min, zależnie od łącza); kolejne trwają sekundy.
-
 x-app-env: &app-env
   DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
   NEO4J_URI: bolt://neo4j:7687
@@ -16,7 +11,6 @@ x-app-env: &app-env
   ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
 
 services:
-  # PostgreSQL 16 + pgvector – rekordy materiałów, wektory, kampanie, reklamy ze skanera
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -35,7 +29,6 @@ services:
       timeout: 5s
       retries: 20
 
-  # Neo4j – kopia grafu powiązań do przeglądania (http://localhost:7474)
   neo4j:
     image: neo4j:5-community
     restart: unless-stopped
@@ -54,7 +47,6 @@ services:
       timeout: 5s
       retries: 30
 
-  # Jednorazowo przy każdym starcie: schemat bazy i modele (pobierane raz do wolumenu `models`).
   init:
     image: fakecollector-app:latest
     pull_policy: never
@@ -76,7 +68,6 @@ services:
       - ./data:/workspace/data
       - models:/models
 
-  # FastAPI – wejście do potoku dla frontu i skanera. Dokumentacja: http://localhost:8000/docs
   api:
     image: fakecollector-app:latest
     pull_policy: never
@@ -100,7 +91,6 @@ services:
       retries: 30
       start_period: 30s
 
-  # Front (React) zbudowany i serwowany przez Caddy; /api/* trafia do usługi api (bez CORS).
   web:
     build:
       context: .
@@ -115,7 +105,6 @@ services:
     volumes:
       - ./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro
 
-  # Jednorazowo: wczytuje materiały z data/BACKUP i data/DANE (jeśli są), gdy baza jest pusta.
   seed:
     image: fakecollector-app:latest
     pull_policy: never
@@ -131,8 +120,6 @@ services:
     volumes: *app-volumes
     shm_size: "2gb"
 
-  # Skaner Biblioteki Reklam Meta: skan co 3 h, podejrzane reklamy trafiają do api:/analyze.
-  # Bez META_ACCESS_TOKEN skaner tylko zapisuje błąd skanu – reszta systemu działa normalnie.
   scheduler:
     image: fakecollector-app:latest
     pull_policy: never
@@ -146,7 +133,6 @@ services:
       ADLIB_ANALYZE_URL: http://api:8000/analyze
     volumes: *app-volumes
 
-  # Python + modele ML + JupyterLab – tu buduje się obraz i tu uruchamia się narzędzia CLI.
   app:
     build:
       context: .

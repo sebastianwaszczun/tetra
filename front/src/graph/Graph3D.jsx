@@ -9,7 +9,6 @@ import { Legend, radius } from './Graph2D.jsx'
 import { PAIR_EDGES, asSelection, gravity, idOf, materialIdOf, prepareGraph, shorten } from './prepare.js'
 import { loadThumb } from './thumbs.js'
 
-// Widok 3D mapy kartoteki: „nocne biurko detektywa” – ciemne tło, ciepłe kolory, płynące powiązania.
 const COLOR = {
   material: '#F3EBDC', campaign: '#D9C3A0', operator: '#E04848', domain: '#C8B48C',
   person: '#B08A55', account: '#E07A7A', kit: '#6FB08A', infra: '#7F9BD8',
@@ -88,7 +87,6 @@ export default function Graph3D({ data, onSelect, height = 640 }) {
     const group = new THREE.Group()
     const r = radius(n)
     if (n.type === 'material') {
-      // materiał to płaski krążek zwrócony do kamery: najpierw papier, po załadowaniu – miniatura zrzutu
       const disc = new THREE.Sprite(new THREE.SpriteMaterial({ map: discTexture(null), toneMapped: false }))
       disc.scale.set(r * 2.4, r * 2.4, 1)
       group.add(disc)

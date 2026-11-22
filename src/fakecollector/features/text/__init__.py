@@ -33,24 +33,20 @@ log = logging.getLogger(__name__)
 
 LEXICON_DIR = Path(__file__).with_name("lexicons")
 
-# Wektor 384-d zapisywany w material_vectors (rodzaj text / text_skeleton); model pobiera się sam przy pierwszym użyciu.
 EMBED_MODEL = os.environ.get(
     "TEXT_EMB_MODEL", "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 )
 EMBEDDINGS_ON = os.environ.get("TEXT_EMBEDDINGS", "1") != "0"
 
-NUM_PERM = 128          # długość podpisu MinHash
-SHINGLE_WORDS = 5       # słowa w jednym shinglu
-CHUNK_WORDS = 180       # długość fragmentu do embeddingu (MiniLM obcina ok. 128 tokenów)
-MAX_CHUNKS = 8          # ile fragmentów od początku tekstu bierzemy do embeddingu
-MIN_WORDS = 15          # poniżej tej liczby słów tekst uznajemy za zbyt krótki do porównań
+NUM_PERM = 128
+SHINGLE_WORDS = 5
+CHUNK_WORDS = 180
+MAX_CHUNKS = 8
+MIN_WORDS = 15
 
-# Wiarygodność tekstu zależnie od źródła: OCR i transkrypcja są zaszumione.
 ORIGIN_WEIGHT = {"html": 1.0, "input": 1.0, "adlib": 1.0, "json": 0.9,
                  "transcript": 0.8, "ocr": 0.6}
 
-# Kategorie narracji: opisy do klasyfikacji zero-shot (podobieństwo embeddingów)
-# i słowa-wskazówki, które działają także bez modelu.
 NARRATIVES: dict[str, dict[str, Any]] = {
     "fake_news_investment": {
         "label": "fałszywy artykuł: znana osoba i sposób na zarabianie",
@@ -90,7 +86,6 @@ NARRATIVES: dict[str, dict[str, Any]] = {
     },
 }
 
-# Znaczniki perswazji: grupy fraz typowych dla scamu. Liczone niezależnie od kategorii.
 PERSUASION = {
     "profit": [r"zarab\w*", r"zarob\w*", r"pasywn\w* dochod\w*|pasywny dochód",
                r"gwarantowan\w*", r"bez ryzyka", r"\d+\s?%\s?(?:zysk|zwrot|miesięcz|dzienn)\w*",
@@ -119,8 +114,6 @@ DATE_RE = re.compile(r"\b\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b")
 NUMBER_RE = re.compile(r"\b\d+(?:[.,]\d+)?\b")
 WORD_RE = re.compile(r"[a-ząćęłńóśźż]+", re.I)
 
-
-# --------------------------------------------------------------------------- słowniki
 
 def _read_lexicon(name: str) -> list[tuple[str, re.Pattern]]:
     out = []
@@ -156,13 +149,11 @@ def _compiled_groups() -> tuple[dict, dict]:
     return narr, pers
 
 
-# --------------------------------------------------------------------------- wejście
-
 @dataclass
 class TextSource:
     """Tekst gotowy do analizy wraz z informacją, skąd pochodzi."""
     text: str
-    origin: str = "html"                       # html / input / ocr / transcript / adlib / json
+    origin: str = "html"
     title: str = ""
     meta: dict[str, Any] = field(default_factory=dict)
     paths: list[str] = field(default_factory=list)
@@ -185,13 +176,12 @@ def extract_text_from_html(html: str) -> tuple[str, dict[str, Any]]:
     meta["headings"] = [h.get_text(" ", strip=True) for h in soup.find_all(["h1", "h2"])][:20]
     meta["outlinks"] = sorted({a["href"] for a in soup.find_all("a", href=True)
                                if a["href"].startswith("http")})[:200]
-    # komentarz "saved from url" w stronach zapisanych przez przeglądarkę
     m = re.search(r"saved from url=\(\d+\)(\S+)", html[:3000])
     if m:
         meta["saved_from"] = m.group(1).rstrip(" -->")
 
     text = ""
-    try:  # trafilatura lepiej wycina samą treść artykułu; jest opcjonalna
+    try:
         import trafilatura  # type: ignore
         text = trafilatura.extract(html, include_comments=True, favor_recall=True) or ""
     except Exception:
@@ -257,8 +247,6 @@ def load_text(path: str | Path) -> TextSource:
                       title=title, meta=meta, paths=[str(f) for f in files])
 
 
-# --------------------------------------------------------------------------- normalizacja
-
 def normalize(text: str) -> str:
     """Małe litery, ujednolicone cudzysłowy i myślniki, pojedyncze spacje."""
     text = unicodedata.normalize("NFKC", text)
@@ -278,8 +266,6 @@ def tokens(text: str, drop_stopwords: bool = True) -> list[str]:
     words = [w.lower() for w in WORD_RE.findall(text)]
     return [w for w in words if len(w) > 1 and not (drop_stopwords and w in sw)]
 
-
-# --------------------------------------------------------------------------- encje i szkielet
 
 def find_entities(text: str) -> dict[str, Any]:
     low = normalize(text)
@@ -314,20 +300,17 @@ def skeleton(text: str) -> str:
     for _, rx in brands_lexicon():
         s = rx.sub(" <MARKA> ", s)
     s = NUMBER_RE.sub(" <LICZBA> ", s)
-    # imiona przed <OSOBA> (np. "rafała <OSOBA>") też są zmienne między odcinkami
     s = re.sub(r"\b[a-ząćęłńóśźż]{3,}\s+<OSOBA>", "<OSOBA>", s)
     s = re.sub(r"(?:<OSOBA>\s*)+", "<OSOBA> ", s)
     return re.sub(r"\s+", " ", s).strip()
 
-
-# --------------------------------------------------------------------------- MinHash
 
 _MERSENNE = np.uint64((1 << 61) - 1)
 
 
 @lru_cache(maxsize=1)
 def _perms() -> tuple[np.ndarray, np.ndarray]:
-    rng = np.random.RandomState(1)  # stałe ziarno: podpisy są porównywalne między uruchomieniami
+    rng = np.random.RandomState(1)
     a = rng.randint(1, 2**31 - 1, size=NUM_PERM, dtype=np.int64).astype(np.uint64)
     b = rng.randint(0, 2**31 - 1, size=NUM_PERM, dtype=np.int64).astype(np.uint64)
     return a, b
@@ -357,8 +340,6 @@ def minhash_jaccard(a: list[int] | None, b: list[int] | None) -> float | None:
     return float(np.mean(np.array(a) == np.array(b)))
 
 
-# --------------------------------------------------------------------------- embeddingi
-
 @lru_cache(maxsize=1)
 def _model():
     from sentence_transformers import SentenceTransformer
@@ -377,7 +358,7 @@ def embed(text: str) -> list[float] | None:
     chunks = [" ".join(words[i:i + CHUNK_WORDS]) for i in range(0, len(words), CHUNK_WORDS)][:MAX_CHUNKS]
     try:
         vecs = _model().encode(_prefix(chunks), normalize_embeddings=True, show_progress_bar=False)
-    except Exception as exc:  # brak modelu albo biblioteki nie może zatrzymać analizy
+    except Exception as exc:
         log.warning("Embedding niedostępny: %s", exc)
         return None
     v = np.asarray(vecs).mean(axis=0)
@@ -404,8 +385,6 @@ def cosine(a: list[float] | None, b: list[float] | None) -> float | None:
         return None
     return float(np.dot(np.asarray(a), np.asarray(b)))
 
-
-# --------------------------------------------------------------------------- słowa kluczowe, narracja
 
 def keywords(text: str, title: str = "", k: int = 15) -> list[str]:
     """Słowa i dwuwyrazowe frazy o największej częstości (tytuł liczy się trzy razy)."""
@@ -457,12 +436,10 @@ def detect_language(text: str) -> str:
     return "en" if en else "other"
 
 
-# --------------------------------------------------------------------------- analiza
-
 @dataclass
 class TextFeatures:
     origin: str
-    confidence: float                     # 0–1: jak bardzo ufać porównaniom po tekście
+    confidence: float
     n_words: int
     language: str
     title: str
@@ -476,7 +453,7 @@ class TextFeatures:
     phones: list[str]
     persuasion: dict[str, int]
     narrative: dict[str, Any]
-    skeleton_preview: str                 # początek szkieletu, do podglądu w GUI
+    skeleton_preview: str
     minhash: list[int] | None
     skeleton_minhash: list[int] | None
     text_emb: list[float] | None
@@ -566,8 +543,6 @@ def extract(incident: Any) -> dict[str, Any] | None:
     return analyze_text(text, origin=origin, title=get("title", "") or "").to_dict()
 
 
-# --------------------------------------------------------------------------- porównanie
-
 def _jaccard(a: Iterable[str], b: Iterable[str]) -> float | None:
     a, b = set(a), set(b)
     if not a or not b:
@@ -598,7 +573,6 @@ def compare(a: dict[str, Any] | TextFeatures, b: dict[str, Any] | TextFeatures) 
     shared_brands = sorted(set(a["brands"]) & set(b["brands"]))
     shared_contacts = sorted((set(a["phones"]) & set(b["phones"])) | (set(a["emails"]) & set(b["emails"])))
 
-    # łączny wynik tekstu: ważona średnia z dostępnych sygnałów
     weights = {"text_minhash": 0.30, "skeleton_minhash": 0.25, "skeleton_cosine": 0.20,
                "text_cosine": 0.15, "keywords": 0.05, "same_narrative": 0.05}
     num = sum(w * s[k] for k, w in weights.items() if s[k] is not None)
@@ -637,8 +611,6 @@ def compare(a: dict[str, Any] | TextFeatures, b: dict[str, Any] | TextFeatures) 
         "reasons": reasons,
     }
 
-
-# --------------------------------------------------------------------------- CLI
 
 def _case_dirs(paths: list[str]) -> list[Path]:
     """Ścieżka do paczki (np. data/BACKUP) zamienia się na listę jej przypadków."""

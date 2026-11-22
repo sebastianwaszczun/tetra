@@ -27,7 +27,6 @@ log = logging.getLogger(__name__)
 
 STORE_ROOT = Path(os.environ.get("STORE_DIR", "data/store"))
 
-# Pierwszeństwo źródeł tekstu dla modułu tekstu (od najlepszego)
 TEXT_PRIORITY = ["input", "html", "page_text", "har", "adlib", "json", "transcript", "ocr"]
 
 ERROR_PAGE_RE = re.compile(
@@ -49,7 +48,7 @@ def is_common_domain(url: str) -> bool:
     from urllib.parse import urlsplit
     host = (urlsplit(url if "://" in url else "https://" + url).hostname or "").lower()
     host = host[4:] if host.startswith("www.") else host
-    from fakecollector.features.osint.utils import is_commodity   # pełna lista z modułu OSINT
+    from fakecollector.features.osint.utils import is_commodity
     if is_commodity(host):
         return True
     return host in COMMON_DOMAINS or any(host.endswith("." + d) for d in COMMON_DOMAINS)
@@ -76,16 +75,16 @@ def _best_per_page(arts: list) -> list:
 
 @dataclass
 class Options:
-    fetch: bool = True          # pobierać strony z URL (Playwright)
-    ocr: bool = True            # OCR zrzutów ekranu
-    ocr_limit: int = 12         # najwyżej tyle obrazów do OCR w jednym materiale
-    video: bool = True          # wyciągać dźwięk i klatki z wideo
-    assets: bool = True         # dodawać obrazy z folderów *_files (dla modułu obrazu)
+    fetch: bool = True
+    ocr: bool = True
+    ocr_limit: int = 12
+    video: bool = True
+    assets: bool = True
     assets_limit: int = 150
-    follow_urls: bool = True    # pobierać adresy znalezione w tekście i na zrzutach
-    max_fetch: int = 2          # najwyżej tyle stron pobranych na materiał
+    follow_urls: bool = True
+    max_fetch: int = 2
     dedup: bool = True
-    save: bool = True           # zapisywać incident.json w folderze materiału
+    save: bool = True
     store_root: Path = STORE_ROOT
 
 
@@ -95,8 +94,6 @@ def is_error_page(title: str, text: str) -> bool:
         return True
     return len(text.split()) < 300 and bool(ERROR_PAGE_RE.search(text[:3000]))
 
-
-# ============================================================================ wejścia
 
 def ingest(value: str | Path, input_type: str | None = None, **opts: Any) -> Incident:
     """Zamienia jedno wejście na Incident. Błędy nie przerywają pracy – trafiają do incident.errors."""
@@ -109,7 +106,7 @@ def ingest(value: str | Path, input_type: str | None = None, **opts: Any) -> Inc
     handler: Callable = HANDLERS.get(kind, _unsupported)
     try:
         handler(inc, value, o)
-    except Exception as exc:  # jeden zły plik nie może zatrzymać całej analizy
+    except Exception as exc:
         log.exception("Preprocessing %s", source)
         inc.errors.append(f"{kind}: {exc.__class__.__name__}: {exc}")
     finalize(inc, o)
@@ -212,7 +209,7 @@ def _har(inc: Incident, value: str | Path, o: Options, source: str = "input") ->
     if len(chain) > len(inc.redirect_chain):
         inc.redirect_chain = chain
     page_url, html = har_mod.main_document(data)
-    if html:  # tekst strony z HAR-a; jeśli jest zapisana strona HTML, ona ma pierwszeństwo
+    if html:
         from fakecollector.features.text import extract_text_from_html
         text, meta = extract_text_from_html(html)
         err = is_error_page(meta.get("title", ""), text)
@@ -224,7 +221,7 @@ def _html(inc: Incident, value: str | Path, o: Options, source: str = "input") -
     from fakecollector.features.text import extract_text_from_html
     path = Path(value)
     if path.suffix.lower() in {".mhtml", ".mht"}:
-        inc.add(HTML, path, source=source, format="mhtml")   # MHTML czyta moduł OSINT
+        inc.add(HTML, path, source=source, format="mhtml")
         return
     raw = path.read_bytes()
     html = raw.decode("utf-8", "replace") if b"\x00" not in raw[:1000] else raw.decode("utf-16", "replace")
@@ -253,7 +250,6 @@ def _json(inc: Incident, value: str | Path, o: Options, source: str = "input") -
         inc.add(JSON, path, source=source, type="list")
         return
     if "extractor" in data and ("webpage_url" in data or "formats" in data):
-        # metadane yt-dlp, np. reklama wideo z Biblioteki Reklam Meta
         inc.add(JSON, path, source=source, type="yt-dlp", extractor=data.get("extractor"))
         if data.get("webpage_url"):
             inc.add_url(data["webpage_url"], "metadata")
@@ -261,15 +257,15 @@ def _json(inc: Incident, value: str | Path, o: Options, source: str = "input") -
         extractor = str(data.get("extractor") or "")
         origin = "adlib" if "facebook" in extractor and "ads" in extractor else "json"
         inc.add_text("\n".join(parts), origin, path=str(path), title=str(data.get("title") or ""))
-    elif str(data.get("tool", "")).startswith("page-capture"):   # manifest narzędzia page-capture
+    elif str(data.get("tool", "")).startswith("page-capture"):
         inc.add(JSON, path, source=source, type="page_capture", observed_at=data.get("captured_at"),
                 title=data.get("title"))
         if data.get("page_url"):
             inc.add_url(data["page_url"], "metadata")
-    elif "url" in data and "timestamp_utc" in data:          # archive_info.json z archiwum strony
+    elif "url" in data and "timestamp_utc" in data:
         inc.add(JSON, path, source=source, type="archive_info", observed_at=data.get("timestamp_utc"))
         inc.add_url(data["url"], "metadata")
-    elif "hostname" in data and "ip" in data:                # dns_ssl.json z archiwum strony
+    elif "hostname" in data and "ip" in data:
         inc.add(JSON, path, source=source, type="dns_ssl", hostname=data.get("hostname"))
     else:
         inc.add(JSON, path, source=source, type="other")
@@ -288,7 +284,7 @@ def _archive(inc: Incident, value: str | Path, o: Options, source: str = "input"
         for zi in z.infolist():
             name = Path(zi.filename)
             if zi.is_dir() or name.is_absolute() or ".." in name.parts:
-                continue  # ochrona przed ścieżkami wychodzącymi poza folder
+                continue
             dest = target / name
             dest.parent.mkdir(parents=True, exist_ok=True)
             with z.open(zi) as src, open(dest, "wb") as dst:
@@ -309,8 +305,6 @@ HANDLERS: dict[str, Callable] = {
     "html": _html, "json": _json, "textfile": _textfile, "archive": _archive, "folder": _folder,
 }
 
-
-# ============================================================================ folder przypadku
 
 def _is_page_capture(manifest: Path) -> bool:
     try:
@@ -373,38 +367,36 @@ def _load_folder(inc: Incident, root: Path, o: Options, source: str) -> None:
     Kolejność: metadane -> strony HTML -> HAR -> teksty -> zrzuty (OCR) -> wideo -> zasoby stron.
     """
     files = sorted(p for p in root.rglob("*") if p.is_file())
-    # zapis narzędziem page-capture: manifest.json + resources/ (obrazy, skrypty, kawałki wideo)
     capture_roots = [p.parent for p in files if p.name == "manifest.json" and _is_page_capture(p)]
     in_capture_res = lambda p: any((r / "resources") in p.parents for r in capture_roots)
     in_assets = lambda p: any(part.endswith("_files") for part in p.relative_to(root).parts[:-1]) \
         or in_capture_res(p)
     main = [p for p in files if not in_assets(p)]
     assets = [p for p in files if in_assets(p)]
-    # strumień wideo HLS (kawałki .ts + lista .m3u8) – z zasobów strony albo luzem
     ts_files = [p for p in files if p.suffix.lower() == ".ts" and _is_mpegts(p)]
     main = [p for p in main if p not in ts_files and p.suffix.lower() != ".m3u8"]
 
     extracted = {p.name for p in root.rglob("*") if p.is_dir()}
     by_ext: dict[str, list[Path]] = {}
     for p in main:
-        ext = p.suffix.lower() or (p.name.lower() if p.name.startswith(".") else "")  # plik o nazwie „.har”
+        ext = p.suffix.lower() or (p.name.lower() if p.name.startswith(".") else "")
         if p.name.endswith((".sha256",)) or p.name in {"sha256.json"}:
             continue
         if ext == ".zip" and p.stem in extracted:
-            continue  # archiwum już rozpakowane obok – nie czytamy dwa razy
+            continue
         if ext == ".pdf":
             continue
         by_ext.setdefault(ext, []).append(p)
 
     for p in by_ext.get(".json", []):
-        if p.parent.name == "storage":     # ciasteczka i localStorage – dla OSINT
+        if p.parent.name == "storage":
             inc.add(JSON, p, source=source, type="storage")
         else:
             _json(inc, p, o, source)
     for ext in sorted(HTML_EXT):
         for p in by_ext.get(ext, []):
             if p.parent.name == "html" and p.name == "source.html" and (p.parent / "rendered.html").exists():
-                continue  # w archiwum strony rendered.html i source.html to ta sama treść
+                continue
             _html(inc, p, o, source)
     for p in by_ext.get(".har", []):
         _har(inc, p, o, source)
@@ -440,8 +432,6 @@ def _load_folder(inc: Incident, root: Path, o: Options, source: str) -> None:
     inc.case_dir = inc.case_dir or str(root)
 
 
-# ============================================================================ pomocnicze
-
 def _ocr_into(inc: Incident, path: Path, o: Options) -> None:
     from .screenshot import find_urls, ocr_image
     try:
@@ -452,12 +442,12 @@ def _ocr_into(inc: Incident, path: Path, o: Options) -> None:
     err = is_error_page("", text)
     inc.add_text(text, "ocr", path=str(path), error_page=err)
     if err:
-        return  # adresy ze zrzutu strony błędu to zwykle cloudflare.com itp.
+        return
     from urllib.parse import urlsplit
     known = {(urlsplit(u if "://" in u else "https://" + u).hostname or "").lower() for u in inc.urls}
     for url in [u for u in find_urls(text) if not is_common_domain(u)][: o.max_fetch]:
         host = (urlsplit(url if "://" in url else "https://" + url).hostname or "").lower()
-        if host not in known:  # ten sam serwis co znany adres – nic nowego
+        if host not in known:
             inc.add_url(url, "ocr")
 
 
@@ -485,9 +475,7 @@ def _fetch_into(inc: Incident, url: str, o: Options) -> None:
         inc.status = "dead"
 
 
-# ============================================================================ złożenie wyniku
-
-MIN_WORDS = 15   # krótszy tekst (np. sam tytuł reklamy „Czytać”) ustępuje następnemu źródłu
+MIN_WORDS = 15
 
 
 def select_text(inc: Incident) -> None:
@@ -496,7 +484,6 @@ def select_text(inc: Incident) -> None:
     Wywoływane w finalize() i ponownie, gdy moduł audio/wideo dopisze transkrypcję.
     """
     parts = [a for a in inc.of_kind(TEXT) if a.value and a.value.strip()]
-    # tekst podany przez użytkownika: dołączamy go, o ile to coś więcej niż sam link
     from .screenshot import OCR_URL_RE
     user = [a for a in parts if a.source == "input" and len(OCR_URL_RE.sub(" ", a.value).split()) >= 3]
     good = [a for a in parts if not a.meta.get("error_page") and a.source != "input"]
@@ -518,7 +505,7 @@ def select_text(inc: Incident) -> None:
         chosen_origin, chosen = fallback
     errors_only = [a for a in parts if a.source != "input"]
     note = "dostępna tylko strona błędu (np. 502) – tekst niewiarygodny"
-    if not chosen and not user and errors_only:  # zostały tylko strony błędów – lepsze to niż nic
+    if not chosen and not user and errors_only:
         chosen_origin, chosen = "html", errors_only
         if note not in inc.missing:
             inc.missing.append(note)
@@ -570,8 +557,6 @@ def finalize(inc: Incident, o: Options) -> None:
     if o.save:
         inc.save()
 
-
-# ============================================================================ przekazanie do OSINT
 
 def run_osint(inc: Incident, enrich: bool = True) -> dict | None:
     """Uruchamia moduł OSINT (features/osint) na składnikach materiału.

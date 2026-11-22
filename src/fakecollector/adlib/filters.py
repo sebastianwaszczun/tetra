@@ -34,7 +34,6 @@ def _na_liscie(domena: str | None, lista: set[str]) -> str | None:
 
 
 def _spoza_lacinki(tekst: str) -> bool:
-    # Polskie litery mieszczą się w Latin Extended-A, więc wszystko powyżej U+024F to inne pismo.
     return any(z.isalpha() and ord(z) > 0x24F for z in tekst)
 
 
@@ -89,7 +88,6 @@ def ocen(r: ReklamaMeta, k: KontekstFiltra, cfg: dict[str, Any]) -> Ocena:
     if r.page_id and ile >= cfg["reklam_strony"]:
         dodaj("spalanie_strony", f"{ile} reklam tej strony w jednym skanie")
 
-    # W pierwszym skanie każda strona jest nowa, więc sygnał ma sens dopiero przy znanej historii.
     if r.page_id and k.strony_znane and r.page_id not in k.strony_znane and r.start:
         try:
             wiek_dni = (k.dzis - date.fromisoformat(r.start[:10])).days

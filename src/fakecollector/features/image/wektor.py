@@ -96,7 +96,6 @@ _BLOKADA_MODELI = Lock()
 
 
 def _tokeny_siglip2(tokenizer: Any, torch: Any, opisy: Sequence[str]) -> Any:
-    # Transformers 5 blokuje return_tensors="pt" przy Torch 2.3. NumPy daje te same identyfikatory.
     tokeny = tokenizer.tokenizer(
         [tokenizer.clean_fn(opis) for opis in opisy],
         return_tensors="np", max_length=tokenizer.context_length, padding="max_length", truncation=True,

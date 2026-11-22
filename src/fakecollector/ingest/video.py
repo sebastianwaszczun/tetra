@@ -9,8 +9,8 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-MAX_FRAMES = 60          # najwyżej tyle klatek na film
-FRAME_WIDTH = 1280       # klatki pomniejszamy do tej szerokości
+MAX_FRAMES = 60
+FRAME_WIDTH = 1280
 
 
 def _run(cmd: list[str], timeout: int = 300) -> subprocess.CompletedProcess:

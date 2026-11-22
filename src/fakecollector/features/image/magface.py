@@ -62,7 +62,6 @@ def norma_magface(wyrownana: NDArray[np.generic]) -> float:
     with _BLOKADA:
         model = _wczytaj_model()
     import torch
-    # Oficjalne wnioskowanie używa BGR z cv2.imread i ToTensor, czyli wartości 0–1.
     wejscie = torch.from_numpy(wyrownana).permute(2, 0, 1).unsqueeze(0).float().div_(255)
     with torch.inference_mode():
         return torch.linalg.vector_norm(model(wejscie)).item()

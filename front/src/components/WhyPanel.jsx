@@ -7,10 +7,7 @@ const MODULE_ORDER = ['text', 'image', 'osint', 'av']
 
 const strip = (id) => String(id ?? '').replace(/^[a-z]+:/, '')
 
-// ---------------------------------------------------------------------------- „dlaczego”
 
-// Kampania = ta sama treść (wkład `contribution`), operator = wspólna infrastruktura (`operator_contribution`:
-// OSINT poza „tożsamością” i wspólne grafiki stron). Dla krawędzi operatora pokazujemy ten drugi.
 function ModuleBreakdown({ a, b, operator = false }) {
   const { data, error, loading, reload } = useFetch(`/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`)
   if (loading) return <Loading text="Porównuję moduły…" />

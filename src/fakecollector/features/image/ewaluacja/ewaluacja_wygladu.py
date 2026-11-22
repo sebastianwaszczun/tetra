@@ -89,7 +89,6 @@ def _ranking_zatwierdzonych(wektory: dict[str, np.ndarray], pary: list[ParaKreac
         wynik = cosinusy.get(a, {}).get(b)
         rangi = []
         if wynik is not None and relacja != "rozne":
-            # Remis dzieli pozycję w rankingu.
             rangi = [1 + sum(w > wynik for w in cosinusy[k].values()) for k in (a, b)]
         wiersze.append({"a": a, "b": b, "relacja": relacja, "cosinus": wynik, "rangi": rangi, "adnotacja": adnotacja})
     rozne = [w for w in wiersze if w["relacja"] == "rozne"
@@ -149,7 +148,6 @@ def _pomiar(model: ModelObrazu, baza: list[Image.Image], warianty: list[tuple[in
     kontrola_logo = None
     pominiete = []
     czasy_rzeczywiste = []
-    # Powtarzamy syntetyczną próbkę, żeby zmierzyć ciepły model i opisy z cache.
     pomiary = [(None, baza[-1])] * 3 + zatwierdzone
     for k, obraz in pomiary:
         if obraz is None:

@@ -12,12 +12,9 @@ from urllib.parse import parse_qsl, unquote, urlsplit
 
 import tldextract
 
-# Wbudowana lista PSL (bez pobierania z sieci) – deterministycznie i offline.
 _TLD_PRIV = tldextract.TLDExtract(suffix_list_urls=(), include_psl_private_domains=True)
 _TLD_ICANN = tldextract.TLDExtract(suffix_list_urls=(), include_psl_private_domains=False)
 
-
-# --------------------------------------------------------------------------- domeny
 
 @lru_cache(maxsize=4096)
 def split_host(host: str) -> dict:
@@ -37,7 +34,7 @@ def split_host(host: str) -> dict:
         for plat in ACTOR_PLATFORMS:
             if host.endswith("." + plat):
                 platform = plat
-                reg = host  # cały host = zasób aktora (np. strefa BunnyCDN)
+                reg = host
                 break
     return {
         "host": host,
@@ -73,8 +70,6 @@ def is_public_ip(s: str) -> bool:
                 or ip.is_reserved or ip.is_unspecified)
 
 
-# Domeny powszechnie używane przez wszystkich (Google, Meta, publiczne CDN-y z bibliotekami).
-# Ich obecność NIE łączy kampanii – ale identyfikatory w nich (Pixel ID, AW-…) już tak.
 COMMODITY_DOMAINS = {
     "google.com", "google.pl", "googleapis.com", "gstatic.com", "googletagmanager.com",
     "google-analytics.com", "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -89,7 +84,6 @@ COMMODITY_DOMAINS = {
     "twitter.com", "twimg.com", "vimeo.com", "vimeocdn.com", "recaptcha.net",
 }
 
-# Platformy, na których subdomena należy do aktora (darmowy hosting / pull-zone CDN).
 ACTOR_PLATFORMS = (
     "netlify.app", "b-cdn.net", "pages.dev", "workers.dev", "vercel.app", "github.io",
     "web.app", "firebaseapp.com", "herokuapp.com", "azurewebsites.net", "cloudfront.net",
@@ -108,14 +102,12 @@ def is_commodity(host: str) -> bool:
         host.endswith("." + d) for d in COMMODITY_DOMAINS)
 
 
-# --------------------------------------------------------------------------- CDN / hosting
 _CLOUDFLARE_V4 = [ipaddress.ip_network(n) for n in (
     "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22",
     "141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20",
     "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13",
     "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22")]
 
-# ASN-y "wielkich chmur/CDN" – współdzielone przez miliony stron => bardzo słaby sygnał.
 SHARED_ASNS = {
     "13335": "Cloudflare", "209242": "Cloudflare", "16509": "Amazon", "14618": "Amazon",
     "15169": "Google", "396982": "Google Cloud", "8075": "Microsoft", "54113": "Fastly",
@@ -137,7 +129,6 @@ def cdn_of_ip(ip: str) -> str | None:
     return None
 
 
-# --------------------------------------------------------------------------- kształty wartości
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-([0-9a-f])[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 _HEX = re.compile(r"^[0-9a-f]+$", re.I)
 _DIG = re.compile(r"^\d+$")
@@ -169,7 +160,7 @@ def value_shape(v: str) -> str:
         if v.isalpha():
             mixed = any(c.isupper() for c in v[1:]) and any(c.islower() for c in v)
             if mixed and len(v) >= 8:
-                return f"A{len(v)}"        # losowy token bez cyfr (np. 'LyTgHoJLnc')
+                return f"A{len(v)}"
             return "word" if len(v) < 12 else f"L{len(v)}"
         return f"A{len(v)}"
     if v.startswith("{{") or v.startswith("{"):
@@ -199,7 +190,6 @@ def template_segment(seg: str) -> str:
         return "{hex}"
     if _ALNUM.match(seg) and len(seg) >= 16 and any(c.isdigit() for c in seg):
         return "{id}"
-    # nazwy plików z hashem: main.933bc64f.png -> main.{h}.png
     seg = re.sub(r"(?<=[._-])[0-9a-f]{8,}(?=[._-])", "{h}", seg, flags=re.I)
     seg = re.sub(r"^[0-9a-f]{24,}(?=\.)", "{h}", seg, flags=re.I)
     return seg
@@ -234,7 +224,6 @@ def uuid7_timestamp(v: str) -> str | None:
         return None
 
 
-# --------------------------------------------------------------------------- hashe
 def sha256(b: bytes) -> str:
     return hashlib.sha256(b).hexdigest()
 

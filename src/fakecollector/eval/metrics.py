@@ -46,7 +46,7 @@ def prf(tp: int, fp: int, fn: int) -> dict[str, float | None]:
     if precision is not None and recall is not None:
         f1 = 2 * precision * recall / (precision + recall) if precision + recall else 0.0
     else:
-        f1 = 0.0 if recall is not None else None     # są pary do znalezienia, a nic nie połączyliśmy
+        f1 = 0.0 if recall is not None else None
     r = lambda x: None if x is None else round(x, 3)  # noqa: E731
     return {"precision": r(precision), "recall": r(recall), "f1": r(f1)}
 
@@ -64,7 +64,7 @@ def adjusted_rand(pred: dict[str, Hashable], gold: dict[str, Hashable]) -> float
     sum_cols = sum(comb(v, 2) for v in cols.values())
     expected = sum_rows * sum_cols / comb(n, 2)
     maximum = (sum_rows + sum_cols) / 2
-    if maximum == expected:          # oba podziały trywialne (same singletony albo jedna grupa)
+    if maximum == expected:
         return 1.0 if dict(rows) and len(rows) == len(cols) else 0.0
     return round((index - expected) / (maximum - expected), 3)
 

@@ -29,7 +29,6 @@ app = FastAPI(
     description="Analiza podejrzanych reklam i łączenie ich w kampanie (HackNation, NASK).",
 )
 
-# Front w React (Vite) działa na innym porcie, więc przeglądarka potrzebuje zgody CORS.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.environ.get("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(","),
@@ -70,7 +69,7 @@ def av_compare(req: AVCompareRequest) -> dict[str, Any]:
     data_root = Path(os.environ.get("DATA_DIR", "data")).resolve()
     for p in (req.a, req.b):
         path = Path(p).resolve()
-        if not path.is_relative_to(data_root):   # tylko dane projektu, nie dowolne pliki kontenera
+        if not path.is_relative_to(data_root):
             raise HTTPException(400, f"Ścieżka musi być w folderze {data_root}")
         if not path.exists():
             raise HTTPException(404, f"Nie ma takiej ścieżki: {p}")
@@ -158,8 +157,6 @@ def image_compare(
     return potok.porownaj_pliki(_read_image(a, limit), _read_image(b, limit))
 
 
-# ----------------------------------------------------------------------------- skaner Biblioteki Reklam
-
 _skaner_obj = None
 _skaner_blokada = threading.Lock()
 
@@ -185,8 +182,6 @@ def adlib_ads(status: Optional[str] = None, limit: int = 50) -> list[dict[str, A
     powody i podsumowanie analizy z id zgłoszenia."""
     return _skaner().magazyn.reklamy(status, min(max(limit, 1), 500))
 
-
-# ----------------------------------------------------------------------------- preprocessing
 
 MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
 
@@ -238,14 +233,14 @@ def analyze(
         "routes": inc.routes(),
         "modules": rec.summary["modules"],
         "text_preview": inc.text[:1000],
-        "candidates": out["candidates"],            # podobne materiały z bazy (wejście dla grupowania)
+        "candidates": out["candidates"],
     }
     if out.get("record_error"):
         result["record_error"] = out["record_error"]
     for name, key in (("text", "text_features"), ("av", "av_features"), ("image", "image_features")):
         data = getattr(res, name)
         if data is not None:
-            result[key] = record_module.strip_vectors(data)       # wektory idą do bazy, nie do frontu
+            result[key] = record_module.strip_vectors(data)
         if name in res.errors:
             result[key] = None
             result[f"{name}_error"] = res.errors[name]
@@ -255,15 +250,12 @@ def analyze(
             result["osint_error"] = res.errors["osint"]
     if save and group and out["saved"]:
         try:
-            # kampania: przypisany / do_weryfikacji / nowy_wzorzec + przesłanki
             result["assignment"] = grouping_module.assign_material(rec.id)
-        except Exception as exc:  # noqa: BLE001 – błąd grupowania nie może zabrać wyniku analizy
+        except Exception as exc:  # noqa: BLE001
             result["assignment"] = None
             result["assignment_error"] = f"{exc.__class__.__name__}: {exc}"
     return result
 
-
-# ----------------------------------------------------------------------------- rekordy materiałów
 
 @app.get("/materials/{material_id}", tags=["rekord materiału"], summary="Rekord materiału (bez wektorów)")
 def material(material_id: str) -> dict[str, Any]:
@@ -331,8 +323,6 @@ def material_decision(material_id: str, req: DecisionRequest = Body(...)) -> dic
         raise HTTPException(409, str(exc)) from exc
 
 
-# ----------------------------------------------------------------------------- kampanie
-
 @app.get("/campaigns", tags=["kampanie"], summary="Lista kampanii")
 def campaigns(min_size: int = 1) -> dict[str, Any]:
     try:
@@ -357,8 +347,6 @@ def compare(a: str, b: str) -> dict[str, Any]:
             raise HTTPException(404, f"Nie ma materiału {mid}.")
     return grouping_module.compare_materials(a, b).to_dict()
 
-
-# ----------------------------------------------------------------------------- graf i statystyki
 
 @app.get("/graph", tags=["graf"], summary="Graf powiązań: węzły i krawędzie")
 def graph(campaign_id: Optional[int] = None, operator: Optional[int] = None, material_id: Optional[str] = None,

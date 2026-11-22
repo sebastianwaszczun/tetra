@@ -1,5 +1,3 @@
-// Odręczne elementy strony: filtry „tuszu” i ziarna, linki nawigacji, linie.
-
 export function SvgDefs() {
   return (
     <svg className="svg-defs" aria-hidden="true" width="0" height="0">

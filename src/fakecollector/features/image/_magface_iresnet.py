@@ -1,11 +1,5 @@
-# SPDX-License-Identifier: Apache-2.0
-# Source: https://github.com/IrvingMeng/MagFace/blob/main/models/iresnet.py
-# Upstream file SHA-256: 9b9670b2190f78782be119a21375e78a81b5444a193ff67d09ca2d48a6b0bc4b
-# Authors: IrvingMeng/MagFace contributors. License text: MAGFACE_LICENSE.
-# Local change: this provenance and license header.
 import torch
 from torch import nn
-# from torchvision.models.utils import load_state_dict_from_url
 
 __all__ = ['iresnet18', 'iresnet34', 'iresnet50', 'iresnet100']
 
@@ -33,7 +27,6 @@ class IBasicBlock(nn.Module):
         if dilation > 1:
             raise NotImplementedError(
                 "Dilation > 1 not supported in BasicBlock")
-        # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.bn1 = nn.BatchNorm2d(inplanes, eps=2e-05, momentum=0.9)
         self.conv1 = conv3x3(inplanes, planes)
         self.bn2 = nn.BatchNorm2d(planes, eps=2e-05, momentum=0.9)
@@ -71,8 +64,6 @@ class IResNet(nn.Module):
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
-            # each element in the tuple indicates if we should replace
-            # the 2x2 stride with a dilated convolution instead
             replace_stride_with_dilation = [False, False, False]
         if len(replace_stride_with_dilation) != 3:
             raise ValueError("replace_stride_with_dilation should be None "
@@ -155,10 +146,6 @@ class IResNet(nn.Module):
 
 def _iresnet(arch, block, layers, pretrained, progress, **kwargs):
     model = IResNet(block, layers, **kwargs)
-    # if pretrained:
-    # state_dict = load_state_dict_from_url(model_urls[arch],
-    #                                        progress=progress)
-    # model.load_state_dict(state_dict)
     return model
 
 

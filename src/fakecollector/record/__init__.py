@@ -39,7 +39,7 @@ def process_incident(inc: Any, *, save: bool = True, candidates: bool = True, **
             out["saved"] = True
             if candidates:
                 out["candidates"] = find_candidates(rec.id)
-        except Exception as exc:  # noqa: BLE001 – brak bazy nie może zabrać wyniku analizy
+        except Exception as exc:  # noqa: BLE001
             out["record_error"] = f"{exc.__class__.__name__}: {exc}"
     return out
 

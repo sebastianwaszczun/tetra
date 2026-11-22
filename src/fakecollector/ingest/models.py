@@ -12,22 +12,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-# Rodzaje składników materiału
-HTML = "html"              # strona internetowa (zapisana albo pobrana)
-HAR = "har"                # zapis ruchu sieciowego
-SCREENSHOT = "screenshot"  # zrzut ekranu reklamy albo strony
-IMAGE = "image"            # obraz z zasobów strony (zdjęcie, baner)
-VIDEO = "video"            # plik wideo
-AUDIO = "audio"            # ścieżka dźwiękowa wyciągnięta z wideo
-FRAME = "frame"            # klatka wyciągnięta z wideo
-URL = "url"                # adres strony (podany, znaleziony w tekście, OCR, HAR, metadanych)
-TEXT = "text"              # fragment tekstu z określonego źródła
-JSON = "json"              # metadane (metadata.json, .info.json, dns_ssl.json…)
+HTML = "html"
+HAR = "har"
+SCREENSHOT = "screenshot"
+IMAGE = "image"
+VIDEO = "video"
+AUDIO = "audio"
+FRAME = "frame"
+URL = "url"
+TEXT = "text"
+JSON = "json"
 
-# Który moduł cech dostaje które składniki
 ROUTES: dict[str, set[str]] = {
     "text": {TEXT},
-    "osint": {URL, HAR, HTML, JSON},   # moduł OSINT sam czyta też zasoby z *_files
+    "osint": {URL, HAR, HTML, JSON},
     "image": {SCREENSHOT, IMAGE, FRAME},
     "av": {VIDEO, AUDIO},
 }
@@ -36,10 +34,10 @@ ROUTES: dict[str, set[str]] = {
 @dataclass
 class Artifact:
     """Jeden składnik materiału."""
-    kind: str                         # jeden z rodzajów powyżej
-    path: str | None = None           # plik na dysku (jeśli jest)
-    value: str | None = None          # wartość bez pliku: adres URL albo tekst
-    source: str = ""                  # skąd się wziął: input, folder, fetch, ocr, har, metadata, video, archive
+    kind: str
+    path: str | None = None
+    value: str | None = None
+    source: str = ""
     meta: dict[str, Any] = field(default_factory=dict)
     sha256: str | None = None
 
@@ -47,31 +45,28 @@ class Artifact:
 @dataclass
 class Incident:
     """Jeden analizowany materiał – niezależnie od tego, w jakiej formie przyszedł."""
-    input_type: str                   # text / url / image / video / har / html / folder / archive / json
-    source: str                       # to, co podano na wejściu (ścieżka, URL albo początek tekstu)
+    input_type: str
+    source: str
     id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat(timespec="seconds"))
-    store_dir: str | None = None      # folder z plikami pobranymi i wytworzonymi dla tego materiału
-    case_dir: str | None = None       # folder przypadku, z którego wczytano pliki (dla modułu OSINT)
+    store_dir: str | None = None
+    case_dir: str | None = None
 
-    # dla modułu tekstu (zgodne z fakecollector.features.text.extract)
     text: str = ""
     text_origin: list[str] = field(default_factory=list)
     title: str = ""
 
-    # adresy i przekierowania
-    urls: list[str] = field(default_factory=list)          # wszystkie znane adresy, pierwszy = główny
+    urls: list[str] = field(default_factory=list)
     final_url: str | None = None
     redirect_chain: list[str] = field(default_factory=list)
 
     artifacts: list[Artifact] = field(default_factory=list)
-    status: str = "ok"                # ok / partial (czegoś brakuje) / dead (strona nie działa)
-    fingerprint: str | None = None    # odcisk wejścia do wykrywania duplikatów
-    duplicate_of: str | None = None   # id wcześniejszego materiału z tym samym odciskiem
+    status: str = "ok"
+    fingerprint: str | None = None
+    duplicate_of: str | None = None
     missing: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
-    # ---------------------------------------------------------------- dodawanie składników
     def add(self, kind: str, path: str | Path | None = None, value: str | None = None,
             source: str = "", **meta: Any) -> Artifact:
         art = Artifact(kind=kind, path=str(path) if path else None, value=value, source=source, meta=meta)
@@ -98,7 +93,6 @@ class Incident:
         if text and text.strip():
             self.add(TEXT, path=path, value=text, source=origin, **meta)
 
-    # ---------------------------------------------------------------- odczyt
     def of_kind(self, *kinds: str) -> list[Artifact]:
         return [a for a in self.artifacts if a.kind in kinds]
 

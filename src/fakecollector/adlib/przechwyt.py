@@ -65,7 +65,7 @@ class Przechwyt:
                 strona.get_by_role("button", name=PRZYCISK_COOKIES).first.click(timeout=3000)
                 strona.wait_for_timeout(500)
             except Exception:
-                pass  # baner nie zawsze się pokazuje
+                pass
             najwiekszy, pole = None, 0.0
             for element in strona.locator("img, video").all():
                 ramka = element.bounding_box()

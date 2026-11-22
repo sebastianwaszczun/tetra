@@ -40,7 +40,7 @@ def _live(url: str, render: bool) -> Capture:
     if render:
         try:
             return fetch_browser(url)
-        except Exception as e:  # noqa: BLE001 – brak Chromium -> zwykły HTTP
+        except Exception as e:  # noqa: BLE001
             cap = fetch_http(url)
             cap.notes.append(f"render niedostępny ({type(e).__name__}), użyto HTTP")
             return cap

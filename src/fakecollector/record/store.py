@@ -87,13 +87,11 @@ CREATE TABLE IF NOT EXISTS material_keys (
 CREATE INDEX IF NOT EXISTS material_keys_lookup ON material_keys (kind, value);
 """
 
-# Progi podobieństwa wektorów, od których materiał staje się kandydatem (luźne – ostateczną
-# decyzję podejmuje etap grupowania po pełnym porównaniu modułami).
 VECTOR_THRESHOLDS = {"text": 0.85, "text_skeleton": 0.88, "voice": 0.70}
 VECTOR_WEIGHTS = {"text": 0.6, "text_skeleton": 0.6, "voice": 0.7, "image": 0.6, "face": 0.7}
 VECTOR_TOP_K = 15
-PHASH_MAX_DISTANCE = 8          # T_p_sporne z config/obraz.toml – próg wyszukiwania kandydatów
-AUDIO_MIN_SHARED = 15           # tyle wspólnych hashy z próbki odcisku dźwięku = kandydat
+PHASH_MAX_DISTANCE = 8
+AUDIO_MIN_SHARED = 15
 FUZZY_KEYS = {"img_phash", "audio_lm"}
 
 _schema_ready = False
@@ -127,8 +125,6 @@ def connect() -> Iterator[Any]:
 def _vec(values: list[float]) -> str:
     return "[" + ",".join(f"{float(v):.6g}" for v in values) + "]"
 
-
-# ============================================================================ zapis i odczyt
 
 def save_record(rec: MaterialRecord) -> str:
     """Zapisuje (albo nadpisuje) rekord materiału razem z cechami, wektorami i kluczami."""
@@ -233,8 +229,6 @@ def count_materials() -> int:
         return conn.execute("SELECT count(*) FROM materials").fetchone()[0]
 
 
-# ============================================================================ kandydaci
-
 def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
     """Materiały z bazy, które mogą należeć do tej samej kampanii, z powodami trafienia.
 
@@ -246,7 +240,6 @@ def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
     """
     hits: dict[str, list[dict[str, Any]]] = defaultdict(list)
     with connect() as conn:
-        # 1. dokładne klucze
         rows = conn.execute(
             """SELECT k2.material_id, k1.kind, count(*), max(k1.weight), (array_agg(k1.value))[1:3]
                FROM material_keys k1
@@ -257,7 +250,6 @@ def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
         for other, kind, n, w, sample in rows:
             hits[other].append({"signal": kind, "matches": n, "weight": float(w), "values": sample})
 
-        # 2a. odcisk dźwięku: wiele wspólnych hashy z próbki
         rows = conn.execute(
             """SELECT k2.material_id, count(*) FROM material_keys k1
                JOIN material_keys k2 ON k2.kind = 'audio_lm' AND k2.value = k1.value AND k2.material_id <> k1.material_id
@@ -267,7 +259,6 @@ def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
         for other, n in rows:
             hits[other].append({"signal": "audio_lm", "matches": n, "weight": KEY_WEIGHTS["audio_lm"]})
 
-        # 2b. hashe percepcyjne obrazów (odległość Hamminga)
         own = [v for (v,) in conn.execute(
             "SELECT value FROM material_keys WHERE material_id = %s AND kind = 'img_phash'", (material_id,))]
         if own:
@@ -282,7 +273,6 @@ def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
                 hits[other].append({"signal": "img_phash", "distance": d,
                                     "weight": KEY_WEIGHTS["img_phash"] * (1 - d / 16)})
 
-        # 3. wektory
         vecs = conn.execute("SELECT kind, model, item, dim, emb::text FROM material_vectors WHERE material_id = %s",
                             (material_id,)).fetchall()
         for kind, model, item, dim, emb in vecs:
@@ -309,12 +299,11 @@ def find_candidates(material_id: str, limit: int = 20) -> list[dict[str, Any]]:
     out = []
     for other, signals in hits.items():
         merged: dict[str, dict] = {}
-        for sgn in signals:          # ten sam sygnał z kilku wektorów/obrazów – zostaw najmocniejszy
+        for sgn in signals:
             prev = merged.get(sgn["signal"])
             if prev is None or sgn.get("weight", 0) > prev.get("weight", 0):
                 merged[sgn["signal"]] = sgn
         weights = sorted((s.get("weight", 0) for s in merged.values()), reverse=True)
-        # ranking: najmocniejszy sygnał + mniejszy wkład kolejnych (1 - Π(1 - w))
         rank = 1.0
         for w in weights:
             rank *= (1 - min(w, 0.99))

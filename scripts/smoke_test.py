@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 DATA = Path(ARGS.data)
 BACKUP, DANE = DATA / "BACKUP", DATA / "DANE"
-RESULTS: list[tuple[str, str, str, str]] = []   # (moduł, nazwa, status, szczegóły)
+RESULTS: list[tuple[str, str, str, str]] = []
 CACHE: dict[str, object] = {}
 
 
@@ -89,7 +89,6 @@ def text_feats(name: str):
 
 print(f"Dane: {DATA.resolve()}   tryb: {'szybki (bez modeli)' if ARGS.fast else 'pełny'}   tmp: {TMP}\n")
 
-# ============================================================================ preprocessing
 print("Preprocessing")
 
 
@@ -153,7 +152,6 @@ def _():
     assert inc.text_origin == ["input"] and inc.urls == ["https://grentavo.click/abc"], (inc.text_origin, inc.urls)
 
 
-# ============================================================================ moduł tekstu
 print("\nModuł tekstu" + (" (bez embeddingów)" if ARGS.fast else ""))
 
 
@@ -195,7 +193,6 @@ def _():
     return f"wynik {r['text_score']}"
 
 
-# ============================================================================ OSINT
 print("\nModuł OSINT" + (" (z DNS/WHOIS/TLS)" if ARGS.enrich else " (bez zapytań do internetu)"))
 
 
@@ -237,7 +234,6 @@ def _():
     return f"wynik {r['score']} ({r['label']})"
 
 
-# ============================================================================ audio i wideo
 print("\nModuł audio i wideo" + (" (bez Whispera i ECAPA)" if ARGS.fast else ""))
 AV_OPTS = dict(asr=not ARGS.fast, voice=not ARGS.fast)
 
@@ -302,7 +298,6 @@ def _():
     return f"tekst z: {inc.text_origin[0]}, {len(inc.text.split())} słów"
 
 
-# ============================================================================ obraz i rekord materiału
 print("\nModuł obrazu i rekord materiału")
 
 
@@ -431,7 +426,6 @@ def _():
     return detail
 
 
-
 @check("ewaluacja", "metryki (ARI, pary) i ocena przypisywania na przykładzie")
 def _():
     from fakecollector.eval import metrics
@@ -448,7 +442,6 @@ def _():
     assert no_text["pairs"]["recall"] == 0.5, no_text["pairs"]
     return "ARI, F1, „wyjmij jeden” i ablacja liczą się poprawnie"
 
-# ============================================================================ API
 print("\nAPI")
 
 
@@ -472,7 +465,6 @@ def _():
     return f"osoby {list(d['text_features']['persons'])[:2]}"
 
 
-# ============================================================================ podsumowanie
 ok = sum(r[2] == "OK" for r in RESULTS)
 bad = [r for r in RESULTS if r[2] == "BŁĄD"]
 skip = [r for r in RESULTS if r[2] == "POMINIĘTO"]

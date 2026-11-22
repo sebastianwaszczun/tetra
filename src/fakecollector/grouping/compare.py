@@ -33,17 +33,15 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-# rzetelność modułu i próg szumu (wynik, od którego moduł zaczyna coś wnosić)
 MODULES = {
     "text":  {"reliability": 1.00, "noise": 0.25, "label": "tekst"},
     "osint": {"reliability": 1.00, "noise": 0.30, "label": "infrastruktura (OSINT)"},
     "av":    {"reliability": 0.95, "noise": 0.30, "label": "audio i wideo"},
     "image": {"reliability": 0.90, "noise": 0.40, "label": "obraz"},
 }
-ASSIGN = 0.75      # od tego wyniku materiały uznajemy za tę samą kampanię (albo operatora)
-REVIEW = 0.50      # od tego – podobne, ale decyzję podejmuje człowiek
+ASSIGN = 0.75
+REVIEW = 0.50
 
-# siła dowodu z modułu obrazu (config/obraz.toml [dowody]) -> mnożnik wyniku
 IMAGE_STRENGTH = {"silny": 1.0, "sredni": 0.75, "slaby": 0.35}
 IMAGE_EVIDENCE_PL = {
     "identyczny_plik": "identyczny plik obrazu", "duplikat_kreacji": "ta sama kreacja",
@@ -52,14 +50,11 @@ IMAGE_EVIDENCE_PL = {
     "ta_sama_twarz": "ta sama twarz", "wspolne_logo": "wspólne logo", "wspolny_qr": "ten sam kod QR",
 }
 MAX_IMAGE_PAIRS = 400
-UBIQUITY_SHARE = 0.30   # ślad obecny w > 30% materiałów (i w > 3) nie łączy materiałów…
-# …ale tylko ślady, które kopiują się razem z wyglądem podszywanego serwisu. Identyfikatory kont
-# (Pixel Meta, GA4, GTM), katalog wdrożenia kitu, serwery aktora czy certyfikaty zostają zawsze:
-# dominujący operator też może być „wszechobecny” w zbiorze.
+UBIQUITY_SHARE = 0.30
 CLONE_PRONE = {"favicon_mmh3", "endpoint", "image_hash", "css_hash", "js_hash", "inline_js_hash",
                "path_layout", "dom_simhash", "url_param_schema", "kit_family", "form_signature", "media_host"}
 IDENTITY_SCOPES = {"identity"}
-DOMAIN_IDENTITY = {"registered_domain", "landing_host"}     # same ID reklamy Meta zostają zawsze
+DOMAIN_IDENTITY = {"registered_domain", "landing_host"}
 SAME_FILE_EVIDENCE = {"identyczny_plik", "duplikat_kreacji", "ten_sam_kadr"}
 
 
@@ -95,10 +90,10 @@ class PairResult:
     b: str
     score: float = 0.0
     weighted_avg: float | None = None
-    decision: str = "brak_powiazania"          # ta_sama_kampania / do_weryfikacji / brak_powiazania
+    decision: str = "brak_powiazania"
     modules: dict[str, dict[str, Any]] = field(default_factory=dict)
     reasons: list[str] = field(default_factory=list)
-    operator_score: float = 0.0                # kampania LUB wspólna infrastruktura
+    operator_score: float = 0.0
     operator_reasons: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -112,8 +107,6 @@ def decision_for(score: float) -> str:
     return "ta_sama_kampania" if score >= ASSIGN else "do_weryfikacji" if score >= REVIEW else "brak_powiazania"
 
 
-# ============================================================================ moduły
-
 def _text(fa: dict, fb: dict) -> dict[str, Any] | None:
     from fakecollector.features import text
     r = text.compare(fa, fb)
@@ -124,7 +117,7 @@ def _text(fa: dict, fb: dict) -> dict[str, Any] | None:
 def _osint(fa: dict, fb: dict, ctx: Context) -> dict[str, Any] | None:
     from fakecollector.features.osint.correlate import compare
     r = compare(fa, fb, ctx.osint_df)
-    best: dict[str, dict] = {}            # w obrębie rodzaju liczy się najmocniejszy ślad
+    best: dict[str, dict] = {}
     skipped = []
     for e in r["evidence"]:
         if e["kind"] in CLONE_PRONE and ctx.ubiquitous(ctx.osint_df.get((e["kind"], e["value"]), 0)):
@@ -190,7 +183,7 @@ def _image(fa: dict, fb: dict, ctx: Context) -> dict[str, Any] | None:
     if not A or not B:
         return None
     index_b = {str(j): klucze_wyszukiwania(c) for j, (_, _, c) in enumerate(B)}
-    best: dict[str, tuple[float, Any, str, str]] = {}      # "campaign" / "operator" -> najlepszy dowód
+    best: dict[str, tuple[float, Any, str, str]] = {}
     pairs = 0
     for name_a, role_a, ca in A:
         for j in szukaj_kandydatow(klucze_wyszukiwania(ca), index_b):
@@ -203,7 +196,7 @@ def _image(fa: dict, fb: dict, ctx: Context) -> dict[str, Any] | None:
             level = "operator" if role_a == role_b == "obrazek_strony" else "campaign"
             for d in porownaj(ca, cb).dowody:
                 if common and d.rodzaj in SAME_FILE_EVIDENCE:
-                    continue          # obrazek obecny w dużej części bazy (logo, grafika podszywanego serwisu)
+                    continue
                 s = float(d.wynik) * IMAGE_STRENGTH.get(d.sila, 0.35)
                 if level not in best or s > best[level][0]:
                     best[level] = (s, d, name_a, name_b)
@@ -220,8 +213,6 @@ def _image(fa: dict, fb: dict, ctx: Context) -> dict[str, Any] | None:
         out.update(operator_score=round(best["operator"][0], 3), operator_reasons=[describe(best["operator"])])
     return out
 
-
-# ============================================================================ łączenie
 
 def _lift(name: str, s: float, c: float) -> float:
     cfg = MODULES[name]
@@ -240,7 +231,7 @@ def compare_features(a_id: str, fa: dict[str, Any], b_id: str, fb: dict[str, Any
             continue
         try:
             r = fn(fa[name], fb[name])
-        except Exception as exc:  # noqa: BLE001 – błąd jednego modułu nie psuje porównania
+        except Exception as exc:  # noqa: BLE001
             log.exception("Porównanie %s", name)
             res.modules[name] = {"error": f"{exc.__class__.__name__}: {exc}"}
             continue
@@ -248,7 +239,6 @@ def compare_features(a_id: str, fa: dict[str, Any], b_id: str, fb: dict[str, Any
             continue
         c = float(r.get("confidence") or 0)
         if name == "osint":
-            # do kampanii liczy się tylko tożsamość (ta sama domena / reklama), reszta – do operatora
             r["contribution"] = _lift(name, float(r["identity_score"]), c)
             r["operator_contribution"] = _lift(name, float(r["operator_score"]), c)
         elif name == "image":
@@ -271,7 +261,6 @@ def compare_features(a_id: str, fa: dict[str, Any], b_id: str, fb: dict[str, Any
     res.operator_score = round(1 - (1 - min(res.score, 0.999))
                                * math.prod(1 - min(x, 0.999) for x in infra), 3)
 
-    # przesłanki: najpierw moduły, które najbardziej wpłynęły na wynik
     for name, m in sorted(res.modules.items(), key=lambda kv: -kv[1].get("contribution", 0)):
         if m.get("contribution", 0) <= 0:
             continue

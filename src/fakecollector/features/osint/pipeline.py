@@ -91,7 +91,6 @@ def _url_params(url: str | None) -> dict:
         **{k: v for k, v in info.items() if k != "secret_params"},
         "secret_params_redacted": info.get("secret_params", []), "secret_hashes": secret_hashes,
         "uuid7_timestamps": ts,
-        # cyrylica w nazwach kont/zestawów (np. 'сс' wklejone w polskie nazewnictwo) – wskazówka języka operatora
         "naming_scripts": sorted({"cyrillic" if any("\u0400" <= ch <= "\u04ff" for ch in v) else "latin"
                                   for v in (info.get("naming") or {}).values()}),
     }
@@ -110,13 +109,13 @@ def analyze_capture(cap: Capture, do_enrich: bool = True, do_ct: bool | None = N
     do_ct = config.ENABLE_CT if do_ct is None else do_ct
     landing_hosts = _landing_hosts(cap)
     html, texts, variants = _merge_html(cap)
-    if not landing_hosts:   # zapisany HTML bez "saved from url" – próbujemy og:url / canonical
+    if not landing_hosts:
         for u in (html.get("canonical"), (html.get("og") or {}).get("url")):
             if u and u.startswith("http") and not is_commodity(host_of(u)):
                 landing_hosts.add(host_of(u))
                 cap.page_url = cap.page_url or u
     landing_inferred = False
-    if not landing_hosts:   # np. strona otwarta z pliku lokalnego: bierzemy hosty dokumentów aktora
+    if not landing_hosts:
         cand = [host_of(r.url) for r in cap.resources if r.url.startswith("http")
                 and (r.resource_type == "document" or "html" in r.mime or r.resource_type == "other")]
         cand = [h for h in cand if h and "." in h and not is_commodity(h)]
@@ -126,7 +125,6 @@ def analyze_capture(cap: Capture, do_enrich: bool = True, do_ct: bool | None = N
             cap.notes.append(f"brak URL strony – landing wywnioskowany z ruchu: {cand[0]}")
     net = extract_network(cap, landing_hosts)
 
-    # ---- trackery (HTML + URL-e żądań + parametry strony)
     tr: dict[tuple, set] = {}
     for kind, val in html.get("tracker_ids") or []:
         tr.setdefault((kind, val), set()).add("html")
@@ -152,7 +150,6 @@ def analyze_capture(cap: Capture, do_enrich: bool = True, do_ct: bool | None = N
         traits.append("template_placeholder_leak")
     traits = sorted(set(traits))
 
-    # ---- wzbogacenie
     observed = cap.observed_at or datetime.now(timezone.utc).isoformat()
     chain_hosts = [h["host"] for h in net["chain"] if h.get("host") and not is_commodity(h["host"])]
     actor_hosts = [h["host"] for h in net["hosts"] if h["role"] == "actor_third_party"]
@@ -219,7 +216,7 @@ def analyze_capture(cap: Capture, do_enrich: bool = True, do_ct: bool | None = N
         "ad_library": cap.ad_library,
         "streams": cap.streams,
     }
-    rec = normalize(rec)            # stały kształt rekordu (schema.py)
+    rec = normalize(rec)
     rec["pivots"] = build_pivots(rec)
     rec["quality"] = _quality(rec, cap, missing, time.time() - t0)
     return rec
@@ -254,7 +251,6 @@ def _enrich(hosts, roles, net, html, observed, do_ct, observed_known=True):
             else:
                 res[k] = {"error": "przekroczony budżet czasu wzbogacania"}
 
-        # IP: z DNS (A/AAAA) + z HAR, tylko dla hostów aktora
         ip_hosts: dict[str, set] = {}
         for ip, hs in net["ip_hosts"].items():
             if any(x in roles for x in hs):

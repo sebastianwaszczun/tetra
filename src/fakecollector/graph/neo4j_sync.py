@@ -56,7 +56,7 @@ def sync(graph: dict[str, Any], clear: bool = True) -> dict[str, int]:
         s.run("CREATE CONSTRAINT fc_id IF NOT EXISTS FOR (n:FC) REQUIRE n.id IS UNIQUE")
         if clear:
             s.run("MATCH (n:FC) DETACH DELETE n")
-        for label, rows in by_label.items():       # etykiety z listy stałych – bezpieczne w zapytaniu
+        for label, rows in by_label.items():
             for i in range(0, len(rows), BATCH):
                 s.run(f"UNWIND $rows AS r MERGE (n:FC {{id: r.id}}) SET n:{label} SET n += r.props",
                       rows=rows[i:i + BATCH])

@@ -153,7 +153,7 @@ docker compose up -d                                             <span class="c"
     <tr><td>TORCH_INDEX</td><td>wersja CPU</td><td>źródło PyTorcha (GPU: <code>docker-compose.gpu.yml</code>)</td></tr>
   </tbody>
 </table>
-<p>Progi i parametry modułów są w <code>config/obraz.toml</code> (obraz), <code>config/adlib.toml</code> (skaner) i w kodzie grupowania (<code>src/fakecollector/grouping/compare.py</code>) – każdy z opisem źródła wartości.</p>
+<p>Progi i parametry modułów są w <code>config/obraz.toml</code> (obraz) i <code>config/adlib.toml</code> (skaner) – każdy z opisem źródła wartości. Wagi i progi grupowania są w <code>src/fakecollector/grouping/compare.py</code>, a ich uzasadnienie w METODYKA.pdf (sekcje 06–07).</p>
 <h3>Token Meta Ad Library API</h3>
 <ol>
   <li>Załóż aplikację na developers.facebook.com i potwierdź tożsamość dla Ad Library API (facebook.com/ads/library/api).</li>

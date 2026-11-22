@@ -51,7 +51,6 @@ def test_formaty(format_pliku: str) -> None:
 
 
 def test_svg_uszkodzony_raster_i_limity() -> None:
-    # Nagłówek PNG deklaruje duży raster, a zapis nie zawiera pikseli.
     tresc = b"IHDR" + struct.pack(">IIBBBBB", 10000, 6000, 8, 2, 0, 0, 0)
     png = b"\x89PNG\r\n\x1a\n" + struct.pack(">I", 13) + tresc + struct.pack(">I", zlib.crc32(tresc))
     for wejscie, powod in (

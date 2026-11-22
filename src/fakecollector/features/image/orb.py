@@ -73,7 +73,6 @@ def _wspolny_obszar(H: Macierz, zrodlo: PunktyORB, cel: PunktyORB,
     wzgledne = krawedzie / (*zrodlo.rozmiar, *zrodlo.rozmiar)
     if min(wzgledne) <= 0:
         return None
-    # Stosunek pola do sąsiednich krawędzi odrzuca silne ścinanie i spłaszczone czworokąty.
     znieksztalcenie = max(max(wzgledne) / min(wzgledne), max(krawedzie * np.roll(krawedzie, -1)) / pole)
     if znieksztalcenie > cfg["maks_znieksztalcenie"]:
         return None

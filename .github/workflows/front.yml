@@ -36,7 +36,6 @@ jobs:
             caddy:2.8.4 caddy validate --config /etc/caddy/Caddyfile
 
   deploy:
-    # jeden deploy naraz na serwerze (front i back odtwarzają kontenery tego samego compose)
     concurrency:
       group: deploy-vps
       cancel-in-progress: false

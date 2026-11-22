@@ -31,5 +31,4 @@ def dobierz_progi(pozytywy: Iterable[Pomiary], negatywy: Iterable[Pomiary], zapa
     bledy = siatka_trafien(negatywy)
     kandydaci = ((p, d) for p in range(65 - zapas) for d in range(65 - zapas)
                  if bledy[p + zapas, d + zapas] == 0)
-    # Przy tej samej czułości wybieramy bardziej restrykcyjną parę.
     return max(kandydaci, key=lambda k: (int(trafienia[k]), -sum(k), -k[0]), default=None)

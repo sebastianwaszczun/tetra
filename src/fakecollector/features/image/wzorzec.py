@@ -24,7 +24,6 @@ Nazwa = Annotated[str, Field(min_length=1)]
 
 
 class Oczekiwane(Model):
-    # None oznacza brak adnotacji, a pusta lista oznacza potwierdzony brak.
     logo: list[str] | None = None
     elementy: list[str] | None = None
     liczba_twarzy: NonNegativeInt | None = None

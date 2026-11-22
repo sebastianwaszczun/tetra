@@ -1,8 +1,4 @@
 #!/bin/sh
-# Buduje docs/*.pdf ze źródeł HTML w tym folderze (Chrome/Chromium ≥ 131 – numery stron z @page).
-#   CHROME=/ścieżka/do/chrome sh docs/src/build.sh [NAZWA ...]
-# Schematy (img/*.png) odtwarza: python docs/src/diagrams.py (Pillow).
-# Fonty (Inter, Inter Tight, Caveat – SIL OFL 1.1) pobierane z github.com/google/fonts przy pierwszym uruchomieniu.
 set -e
 cd "$(dirname "$0")"
 CHROME="${CHROME:-chromium}"

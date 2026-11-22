@@ -13,5 +13,8 @@ do_udostępnienia/
 # materiały od organizatorów (treść zadania NASK) – tylko lokalnie
 docs/tresc_zadania_nask.pdf
 .venv/
-# Dokumentacja (.md) zostaje lokalnie, do repo trafia tylko kod.
+# Notatki (.md) zostają lokalnie; do repo trafia README.md i dokumentacja w PDF (docs/*.pdf).
 *.md
+!README.md
+# źródła dokumentacji (Markdown + skrypt do PDF) – tylko lokalnie
+docs/zrodla/

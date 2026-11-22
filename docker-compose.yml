@@ -1,7 +1,22 @@
 name: fakecollector
 
+# Cały system jedną komendą:   docker compose up -d
+#   front (GUI):   http://localhost:8080        API: http://localhost:8000/docs
+#   Neo4j:         http://localhost:7474        JupyterLab: http://localhost:8888 (token: fake)
+# Pierwszy start buduje obraz i pobiera modele (20–40 min, zależnie od łącza); kolejne trwają sekundy.
+
+x-app-env: &app-env
+  DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
+  NEO4J_URI: bolt://neo4j:7687
+  NEO4J_USER: ${NEO4J_USER:-neo4j}
+  NEO4J_PASSWORD: ${NEO4J_PASSWORD:-fakecollector}
+  PYTHONPATH: /workspace/src
+  STORE_DIR: /workspace/data/store
+  META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
+  ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
+
 services:
-  # PostgreSQL 16 + pgvector – reklamy, metadane i embeddingi (twarze, obraz, tekst, głos)
+  # PostgreSQL 16 + pgvector – rekordy materiałów, wektory, kampanie, reklamy ze skanera
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -20,7 +35,7 @@ services:
       timeout: 5s
       retries: 20
 
-  # Neo4j – graf powiązań reklam/kampanii z uzasadnieniem na każdej krawędzi
+  # Neo4j – kopia grafu powiązań do przeglądania (http://localhost:7474)
   neo4j:
     image: neo4j:5-community
     restart: unless-stopped
@@ -29,7 +44,7 @@ services:
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_server_memory_heap_max__size: 1G
     ports:
-      - "${NEO4J_HTTP_PORT:-7474}:7474"   # przeglądarka: http://localhost:7474
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
       - "${NEO4J_BOLT_PORT:-7687}:7687"
     volumes:
       - neo4jdata:/data
@@ -39,8 +54,99 @@ services:
       timeout: 5s
       retries: 30
 
-  # Python + ML: InsightFace, facetorch, CLIP/SigLIP, sentence-transformers, OCR,
-  # SpeechBrain, MinHash, narzędzia OSINT. Startuje JupyterLab.
+  # Jednorazowo przy każdym starcie: schemat bazy i modele (pobierane raz do wolumenu `models`).
+  init:
+    image: fakecollector-app:latest
+    pull_policy: never
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    command: python -m fakecollector.bootstrap
+    environment:
+      <<: *app-env
+      IMAGE_MODELS: ${IMAGE_MODELS:-siglip2,clip,buffalo_l,yunet_sface,magface,facetorch}
+      PRELOAD_MODELS: ${PRELOAD_MODELS:-1}
+    volumes: &app-volumes
+      - ./src:/workspace/src
+      - ./scripts:/workspace/scripts
+      - ./config:/workspace/config
+      - ./data:/workspace/data
+      - models:/models
+
+  # FastAPI – wejście do potoku dla frontu i skanera. Dokumentacja: http://localhost:8000/docs
+  api:
+    image: fakecollector-app:latest
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command: uvicorn fakecollector.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /workspace/src
+    environment:
+      <<: *app-env
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080}
+      ADLIB_ANALYZE_URL: http://localhost:8000/analyze
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes: *app-volumes
+    shm_size: "2gb"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8000/openapi.json >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  # Front (React) zbudowany i serwowany przez Caddy; /api/* trafia do usługi api (bez CORS).
+  web:
+    build:
+      context: .
+      dockerfile: deploy/web.Dockerfile
+    image: fakecollector-web:latest
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    volumes:
+      - ./deploy/Caddyfile.local:/etc/caddy/Caddyfile:ro
+
+  # Jednorazowo: wczytuje materiały z data/BACKUP i data/DANE (jeśli są), gdy baza jest pusta.
+  seed:
+    image: fakecollector-app:latest
+    pull_policy: never
+    restart: "no"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    command: python -m fakecollector.bootstrap --seed
+    environment:
+      <<: *app-env
+      SEED_DIRS: ${SEED_DIRS:-data/BACKUP data/DANE}
+      SEED_ASR: ${SEED_ASR:-1}
+    volumes: *app-volumes
+    shm_size: "2gb"
+
+  # Skaner Biblioteki Reklam Meta: skan co 3 h, podejrzane reklamy trafiają do api:/analyze.
+  # Bez META_ACCESS_TOKEN skaner tylko zapisuje błąd skanu – reszta systemu działa normalnie.
+  scheduler:
+    image: fakecollector-app:latest
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    command: python -m fakecollector.adlib
+    environment:
+      <<: *app-env
+      ADLIB_ANALYZE_URL: http://api:8000/analyze
+    volumes: *app-volumes
+
+  # Python + modele ML + JupyterLab – tu buduje się obraz i tu uruchamia się narzędzia CLI.
   app:
     build:
       context: .
@@ -49,78 +155,21 @@ services:
     image: fakecollector-app:latest
     restart: unless-stopped
     depends_on:
-      postgres:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
+      init:
+        condition: service_completed_successfully
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: ${NEO4J_USER:-neo4j}
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-fakecollector}
+      <<: *app-env
       JUPYTER_TOKEN: ${JUPYTER_TOKEN:-fake}
-      PYTHONPATH: /workspace/src
-      STORE_DIR: /workspace/data/store
     ports:
       - "${JUPYTER_PORT:-8888}:8888"
     volumes:
-      - ./src:/workspace/src          # kod zespołu
-      - ./data:/workspace/data        # dane (np. rozpakowany ___BACKUP.zip)
+      - ./src:/workspace/src
+      - ./data:/workspace/data
       - ./scripts:/workspace/scripts
       - ./tests:/workspace/tests
       - ./config:/workspace/config
-      - models:/models                # cache modeli – pobierane raz, współdzielone
-    shm_size: "2gb"
-
-  # FastAPI – wejście do potoku dla frontu i harmonogramu. Dokumentacja: http://localhost:8000/docs
-  api:
-    image: fakecollector-app:latest
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
-    command: uvicorn fakecollector.api.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /workspace/src
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
-      NEO4J_URI: bolt://neo4j:7687
-      NEO4J_USER: ${NEO4J_USER:-neo4j}
-      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-fakecollector}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://127.0.0.1:5173}
-      PYTHONPATH: /workspace/src
-      STORE_DIR: /workspace/data/store
-      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
-      ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
-      ADLIB_ANALYZE_URL: http://localhost:8000/analyze
-    ports:
-      - "${API_PORT:-8000}:8000"
-    volumes:
-      - ./src:/workspace/src
-      - ./data:/workspace/data
-      - ./config:/workspace/config
       - models:/models
-
-  # Skaner Biblioteki Reklam Meta: skan co kilka godzin, reklamy trafiają do api:/analyze.
-  scheduler:
-    image: fakecollector-app:latest
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      api:
-        condition: service_started
-    command: python -m fakecollector.adlib
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-fake}:${POSTGRES_PASSWORD:-fake}@postgres:5432/${POSTGRES_DB:-fakecollector}
-      PYTHONPATH: /workspace/src
-      META_ACCESS_TOKEN: ${META_ACCESS_TOKEN:-}
-      ADLIB_TRYB: ${ADLIB_TRYB:-na_zywo}
-      ADLIB_ANALYZE_URL: http://api:8000/analyze
-    volumes:
-      - ./src:/workspace/src
-      - ./data:/workspace/data
-      - ./config:/workspace/config
+    shm_size: "2gb"
 
 volumes:
   pgdata:

@@ -5,3 +5,7 @@ data/
 .git
 front/node_modules
 front/dist
+*.zip
+docs/*.pdf
+**/node_modules
+.github

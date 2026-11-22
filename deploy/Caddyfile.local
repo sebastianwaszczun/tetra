@@ -1,0 +1,20 @@
+# Lokalny front (docker-compose.yml, usługa web): http://localhost:8080
+# /api/* -> usługa api (prefiks /api jest zdejmowany), reszta -> zbudowany front (SPA).
+:80 {
+	encode zstd gzip
+
+	handle_path /api/* {
+		reverse_proxy api:8000 {
+			transport http {
+				read_timeout 15m
+				write_timeout 15m
+			}
+		}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

@@ -359,7 +359,17 @@ export function MaterialPage({ id }) {
   const afterDecision = () => { setSelected(null); m.reload(); g.reload() }
 
   if (m.loading && !m.data) return <div className="view"><Loading /></div>
-  if (m.error) return <div className="view"><ErrorNote error={m.error} retry={m.reload} /></div>
+  if (m.error) {
+    return (
+      <div className="view">
+        <PageHead kicker="Materiał" title="Brak w kartotece" back={{ href: href.campaigns, label: 'kampanie' }} />
+        {/nie ma takiego/i.test(m.error.message)
+          ? <Note>Tego materiału nie ma w kartotece. Mógł zostać przeanalizowany, zanim kartoteka zapisywała wyniki
+              (ponowna analiza: <code>python -m fakecollector.worker --ponow</code>), albo został usunięty.</Note>
+          : <ErrorNote error={m.error} retry={m.reload} />}
+      </div>
+    )
+  }
   const d = m.data
 
   return (

@@ -183,6 +183,37 @@ class Skaner:
                 self.magazyn.dodaj_trop("fraza", produkt, "wynik", f"tytuł reklamy {r.id}")
         return True
 
+    def ponow_analize(self, limit: int | None = None) -> dict[str, Any]:
+        """Ponowna analiza reklam, których wynik nie trafił do kartoteki (tabela materials): przeanalizowanych
+        zanim potok zapisywał rekordy, z błędem albo przerwanych w trakcie. Ocena filtra zostaje ta sama;
+        zapisany zrzut kreacji jest używany ponownie, więc nie trzeba tokenu do podglądu reklamy."""
+        with self.magazyn.blokada() as wolne:
+            if not wolne:
+                return {"status": "zajety", "komunikat": "Inny skan właśnie trwa"}
+            jest_kartoteka = self.magazyn.conn.execute("SELECT to_regclass('materials') IS NOT NULL AS j").fetchone()["j"]
+            brak = "TRUE" if not jest_kartoteka else \
+                "r.id_zgloszenia IS NULL OR NOT EXISTS (SELECT 1 FROM materials m WHERE m.id = r.id_zgloszenia)"
+            wiersze = self.magazyn.conn.execute(
+                f"""SELECT r.id, r.rekord, r.wynik, r.powody FROM adlib_reklamy r
+                    WHERE r.status IN ('przeanalizowana', 'blad', 'w_analizie') AND ({brak})
+                    ORDER BY r.wynik DESC NULLS LAST""").fetchall()
+            wiersze = wiersze[:limit] if limit else wiersze
+            bledy: list[str] = []
+            udane = 0
+            if wiersze:
+                with self.przechwyt() as przechwyt:
+                    for w in wiersze:
+                        try:
+                            r = ReklamaMeta.z_api(w["rekord"])
+                            o = Ocena(wynik=w["wynik"] or 0.0, powody=w["powody"] or [])
+                        except (KeyError, ValidationError) as exc:
+                            bledy.append(f"reklama {w['id']}: {exc.__class__.__name__}")
+                            continue
+                        if self._analizuj(r, w["rekord"], o, przechwyt, bledy):
+                            udane += 1
+        log.info("Ponowna analiza: %s z %s", udane, len(wiersze))
+        return {"status": "zakonczony", "do_ponowienia": len(wiersze), "przeanalizowanych": udane, "bledy": bledy}
+
     # ------------------------------------------------------------------ zadania dobowe
     def sprawdz_zdjete(self) -> dict[str, Any]:
         """Czy Meta zdjęła przeanalizowane reklamy. Pojedynczej reklamy nie da się odczytać po id,

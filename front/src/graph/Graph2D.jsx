@@ -13,7 +13,6 @@ const PAPER_HI = '#FFFBF3'
 const RED = '#C62828'
 const OCHRE = '#B7791F'
 
-// wygląd węzłów: rozmiar (promień w jednostkach grafu), kształt i wypełnienie „ołówkiem” Rough.js
 const NODE_STYLE = {
   material: { r: 15, name: 'materiał (miniatura zrzutu)', fill: PAPER_HI, fillStyle: 'solid' },
   campaign: { r: 15, name: 'kampania (teczka)', fill: INK, fillStyle: 'hachure', gap: 2.6 },
@@ -50,7 +49,6 @@ function rgba(hex, a) {
   return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`
 }
 
-// ---------------------------------------------------------------- kształty Rough.js (liczone raz, rysowane co klatkę)
 
 const gen = rough.generator()
 const drawables = new Map()
@@ -89,7 +87,6 @@ function ring(r, color, dash, seed) {
   return drawables.get(key)
 }
 
-// ---------------------------------------------------------------- miniatury zrzutów materiałów
 
 function useThumbs(nodes, max = 40) {
   const [images, setImages] = useState(() => new Map())
@@ -106,7 +103,6 @@ function useThumbs(nodes, max = 40) {
   return images
 }
 
-// ---------------------------------------------------------------- legenda
 
 function LegendIcon({ type }) {
   const st = NODE_STYLE[type]
@@ -150,7 +146,6 @@ export function Legend({ nodes, links }) {
   )
 }
 
-// ---------------------------------------------------------------- graf 2D
 
 export default function Graph2D({ data, onSelect, hideTypes = [], focusId = null, height = 560 }) {
   const wrap = useRef(null)
@@ -158,7 +153,7 @@ export default function Graph2D({ data, onSelect, hideTypes = [], focusId = null
   const fitted = useRef(false)
   const [width, setWidth] = useState(800)
   const [hover, setHover] = useState(null)
-  const [active, setActive] = useState(null)       // { node } albo { link }
+  const [active, setActive] = useState(null)
 
   const graph = useMemo(() => prepareGraph(data, { hideTypes }), [data, hideTypes.join()]) // eslint-disable-line react-hooks/exhaustive-deps
   const thumbs = useThumbs(graph.nodes)
@@ -266,7 +261,7 @@ export default function Graph2D({ data, onSelect, hideTypes = [], focusId = null
     if (!PAIR_EDGES.has(link.type) || link.weight == null || !linkLit(link)) return
     const s = link.source, t = link.target
     if (typeof s !== 'object' || typeof t !== 'object') return
-    const x = (s.x + t.x) / 2 + (t.y - s.y) * 0.1        // środek łuku przy krzywiźnie 0.2
+    const x = (s.x + t.x) / 2 + (t.y - s.y) * 0.1
     const y = (s.y + t.y) / 2 - (t.x - s.x) * 0.1
     const fs = Math.max(4, 10.5 / scale)
     const text = link.weight.toFixed(2)

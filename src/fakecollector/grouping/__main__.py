@@ -14,7 +14,7 @@ import json
 import sys
 
 
-def _src(mid: str, cache: dict = {}) -> str:  # noqa: B006 – prosty cache na czas jednego uruchomienia
+def _src(mid: str, cache: dict = {}) -> str:  # noqa: B006
     if mid not in cache:
         from fakecollector.record import load_summary
         s = load_summary(mid) or {}

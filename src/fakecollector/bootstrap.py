@@ -28,7 +28,7 @@ from pathlib import Path
 
 log = logging.getLogger("fakecollector.bootstrap")
 
-ROOT = Path(__file__).resolve().parents[2]                      # /workspace
+ROOT = Path(__file__).resolve().parents[2]
 MODELS_DIR = Path("/models/obraz")
 ALL_IMAGE_MODELS = "siglip2,clip,buffalo_l,yunet_sface,magface,facetorch"
 HF_REPOS = {
@@ -37,8 +37,6 @@ HF_REPOS = {
     "audio (odcisk głosu)": "speechbrain/spkrec-ecapa-voxceleb",
 }
 
-
-# ----------------------------------------------------------------------------- baza
 
 def wait_for_db(timeout: int = 120) -> None:
     import psycopg
@@ -68,7 +66,7 @@ def ensure_schema() -> None:
         m = Magazyn()
         m.przygotuj()
         m.zamknij()
-    except Exception as exc:  # noqa: BLE001 – skaner jest dodatkiem, nie warunkiem startu
+    except Exception as exc:  # noqa: BLE001
         log.warning("Schemat skanera Biblioteki Reklam: %s", exc)
     log.info("Schemat bazy gotowy")
 
@@ -77,8 +75,6 @@ def count_materials() -> int:
     from fakecollector.record import count_materials as count
     return count()
 
-
-# ----------------------------------------------------------------------------- modele
 
 def download_image_models() -> None:
     wanted = [m.strip() for m in os.environ.get("IMAGE_MODELS", ALL_IMAGE_MODELS).split(",") if m.strip()]
@@ -127,8 +123,6 @@ def build_reference_faces() -> None:
         log.warning("Nie udało się zbudować bazy twarzy – sprawdź data/reference_people/*/zrodla.json")
 
 
-# ----------------------------------------------------------------------------- dane
-
 def seed() -> None:
     dirs = [d for d in os.environ.get("SEED_DIRS", "data/BACKUP data/DANE").split() if (ROOT / d).is_dir()]
     if not dirs:
@@ -157,8 +151,6 @@ def seed() -> None:
             log.warning("Krok „%s” zakończył się błędem (kod %s)", what, r.returncode)
     log.info("Wczytywanie zakończone: %d materiałów", count_materials())
 
-
-# ----------------------------------------------------------------------------- start
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="python -m fakecollector.bootstrap", description=__doc__.split("\n")[0])

@@ -1,5 +1,3 @@
-// Miniatury zrzutów materiałów dla grafów 2D i 3D (pobierane raz na materiał).
-// crossOrigin: canvas i WebGL przyjmą obraz z API tylko za zgodą CORS.
 import { canvasImageUrl, getJSON } from '../lib/api.js'
 
 const cache = new Map()

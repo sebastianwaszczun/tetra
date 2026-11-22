@@ -450,7 +450,7 @@ Wszystko ma wartości domyślne; zmiany w `.env` (wzór: [`.env.example`](.env.e
 | `SEED_DIRS`, `SEED_ASR` | `data/BACKUP data/DANE`, 1 | co wczytuje `seed` i czy z transkrypcją |
 | `TORCH_INDEX` | CPU | źródło PyTorcha (GPU: `docker-compose.gpu.yml`) |
 
-Progi modułów z opisem źródła każdej wartości: [`config/obraz.toml`](config/obraz.toml), [`config/adlib.toml`](config/adlib.toml), [`grouping/compare.py`](src/fakecollector/grouping/compare.py).
+Progi modułów z opisem źródła każdej wartości: [`config/obraz.toml`](config/obraz.toml), [`config/adlib.toml`](config/adlib.toml); wagi i progi grupowania: [`grouping/compare.py`](src/fakecollector/grouping/compare.py) (uzasadnienie w [`docs/METODYKA.pdf`](docs/METODYKA.pdf)).
 Pełna lista zmiennych: [`docs/INSTALACJA.pdf`](docs/INSTALACJA.pdf).
 
 ## 17. Struktura repozytorium

@@ -18,14 +18,11 @@ from .pipeline import ModuleResults
 
 SCHEMA_VERSION = 1
 
-# Pasma MinHash (LSH): 32 pasma po 4 liczby. Dwa teksty o podobieństwie Jaccarda 0,5 mają
-# wspólne pasmo z prawdopodobieństwem ~87%, przy 0,2 – ~5%. Wystarczy do wyszukania kandydatów.
 LSH_BANDS, LSH_ROWS = 32, 4
 MIN_WORDS_FOR_TEXT_KEYS = 15
-OSINT_MIN_WEIGHT = 0.5            # słabsze pivoty (rejestrator, TLD, CDN) nie służą do wyszukiwania
-AUDIO_SAMPLE_MOD = 16             # co 16. hash odcisku dźwięku jako klucz (deterministyczna próbka)
+OSINT_MIN_WEIGHT = 0.5
+AUDIO_SAMPLE_MOD = 16
 
-# Waga klucza = jak mocno samo trafienie wskazuje na powiązanie (do kolejności kandydatów).
 KEY_WEIGHTS = {
     "text_sha256": 1.0, "text_lsh": 0.6, "skel_lsh": 0.5, "url": 1.0, "domain": 0.9,
     "person": 0.3, "person_visual": 0.4, "phone": 0.9, "email": 0.9,
@@ -40,13 +37,11 @@ VECTOR_FIELDS = {"clip_emb", "text_emb", "skeleton_emb", "minhash", "skeleton_mi
 class MaterialRecord:
     id: str
     summary: dict[str, Any]
-    features: dict[str, Any] = field(default_factory=dict)        # moduł -> pełne cechy
-    versions: dict[str, str] = field(default_factory=dict)        # moduł -> wersja modelu/schematu
-    vectors: list[tuple[str, str, int, list[float]]] = field(default_factory=list)   # rodzaj, model, nr, wartości
-    keys: list[tuple[str, str, float]] = field(default_factory=list)                 # rodzaj, wartość, waga
+    features: dict[str, Any] = field(default_factory=dict)
+    versions: dict[str, str] = field(default_factory=dict)
+    vectors: list[tuple[str, str, int, list[float]]] = field(default_factory=list)
+    keys: list[tuple[str, str, float]] = field(default_factory=list)
 
-
-# ============================================================================ pomocnicze
 
 def _registered_domain(url: str | None) -> str | None:
     """Domena rejestrowalna adresu (example.co.uk), liczona tak samo jak w module OSINT."""
@@ -77,8 +72,6 @@ def strip_vectors(obj: Any) -> Any:
     return obj
 
 
-# ============================================================================ budowa
-
 def build_record(inc: Any, res: ModuleResults) -> MaterialRecord:
     t, a, o, im = res.text, res.av, res.osint, res.image
     from fakecollector.ingest.core import is_common_domain
@@ -87,7 +80,7 @@ def build_record(inc: Any, res: ModuleResults) -> MaterialRecord:
     final_url = inc.final_url or (inc.urls[0] if inc.urls else None)
     main_domain = domains[0] if domains else _registered_domain(final_url)
     if main_domain and is_common_domain(main_domain):
-        main_domain = None        # np. facebook.com z linku do Biblioteki Reklam – nie jest domeną scamu
+        main_domain = None
 
     modules = {}
     for name, data in (("text", t), ("av", a), ("osint", o), ("image", im)):
@@ -117,7 +110,6 @@ def build_record(inc: Any, res: ModuleResults) -> MaterialRecord:
     }
     rec = MaterialRecord(id=inc.id, summary=summary)
 
-    # ---- pełne cechy i wersje
     if t:
         from fakecollector.features import text as text_module
         rec.features["text"], rec.versions["text"] = t, text_module.EMBED_MODEL
@@ -168,7 +160,6 @@ def _add_keys(rec: MaterialRecord, inc: Any) -> None:
         keys[(kind, str(value))] = max(keys.get((kind, str(value)), 0.0),
                                        weight if weight is not None else KEY_WEIGHTS.get(kind, 0.5))
 
-    # adresy
     from fakecollector.ingest.dedup import normalize_url
     for u in {rec.summary["final_url"], *(inc.urls[:3])}:
         if u:
@@ -176,7 +167,6 @@ def _add_keys(rec: MaterialRecord, inc: Any) -> None:
     for d in rec.summary["domains"] or ([rec.summary["domain"]] if rec.summary["domain"] else []):
         add("domain", d)
 
-    # tekst
     t = rec.features.get("text")
     if t and (t.get("n_words") or 0) >= MIN_WORDS_FOR_TEXT_KEYS:
         add("text_sha256", t.get("text_sha256"))
@@ -193,25 +183,22 @@ def _add_keys(rec: MaterialRecord, inc: Any) -> None:
     for em in (t or {}).get("emails", []):
         add("email", em.lower())
 
-    # OSINT: pivoty o wadze >= 0.5 (domena, piksele, kit, certyfikat, IP poza CDN…)
     for p in (rec.features.get("osint") or {}).get("pivots", []):
         w = float(p.get("weight") or 0)
         if w >= OSINT_MIN_WEIGHT and p.get("value") is not None and p.get("kind") != "dom_simhash":
             add(f"osint:{p['kind']}", p["value"], w)
 
-    # obraz
     for item in (rec.features.get("image") or {}).get("items", []):
         c = item["cechy"]
         if item["rola"] == "obrazek_strony" and c.get("ubogi_w_tresc"):
             continue
         add("img_sha256", c.get("sha256") or None)
-        for h in (c.get("hashe") or {}).get("phash", [])[:1]:    # wariant „cały”
+        for h in (c.get("hashe") or {}).get("phash", [])[:1]:
             if not (c.get("ubogi_w_tresc") or c.get("za_maly")):
                 add("img_phash", h)
         for q in c.get("qr", []):
             add("qr", (q.get("tekst") or "").strip().lower())
 
-    # audio: deterministyczna próbka odcisku (ta sama ścieżka => te same hashe)
     for item in (rec.features.get("av") or {}).get("items", []):
         for h in set(item.get("audio_fp_hashes") or []):
             if h % AUDIO_SAMPLE_MOD == 0:

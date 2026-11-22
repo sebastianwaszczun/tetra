@@ -16,11 +16,10 @@ from fakecollector.features.osint.live import UnsafeTarget, check_target
 
 log = logging.getLogger(__name__)
 
-# te same nagłówki co moduł OSINT: mobilna przeglądarka z Facebooka omija część cloakingu
 USER_AGENT = os.environ.get("FETCH_USER_AGENT", osint_config.USER_AGENT)
 REFERER = osint_config.REFERER
 TIMEOUT_MS = int(os.environ.get("FETCH_TIMEOUT_MS", "30000"))
-SETTLE_MS = int(os.environ.get("FETCH_SETTLE_MS", "3000"))   # czas na przekierowania w JS
+SETTLE_MS = int(os.environ.get("FETCH_SETTLE_MS", "3000"))
 
 
 @dataclass
@@ -59,7 +58,7 @@ def fetch(url: str, out_dir: str | Path, timeout_ms: int = TIMEOUT_MS) -> FetchR
         return res
     try:
         _fetch_playwright(url, out, timeout_ms, res)
-    except Exception as exc:  # brak przeglądarki, timeout, błąd DNS…
+    except Exception as exc:
         log.warning("Playwright nie pobrał %s: %s", url, exc)
         res.error = f"playwright: {exc.__class__.__name__}: {str(exc).splitlines()[0][:200]}"
         _fetch_httpx(url, out, timeout_ms, res)
@@ -87,7 +86,6 @@ def _fetch_playwright(url: str, out: Path, timeout_ms: int, res: FetchResult) ->
                 pass
             page.wait_for_timeout(SETTLE_MS)
 
-            # łańcuch przekierowań HTTP + ewentualne przekierowanie w JS
             chain: list[str] = []
             if response is not None:
                 req = response.request
@@ -110,7 +108,7 @@ def _fetch_playwright(url: str, out: Path, timeout_ms: int, res: FetchResult) ->
             except Exception:
                 page.screenshot(path=str(shot), timeout=20000)
             res.screenshot_path = str(shot)
-            ctx.close()  # dopiero zamknięcie kontekstu zapisuje HAR
+            ctx.close()
             res.har_path = str(har_path) if har_path.exists() else None
             res.error = None
         finally:

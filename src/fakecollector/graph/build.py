@@ -20,7 +20,6 @@ from typing import Any
 
 from fakecollector.grouping.compare import ASSIGN, CLONE_PRONE, REVIEW, load_context
 
-# rodzaj klucza rekordu -> typ węzła grafu
 ENTITY_KIND: dict[str, str] = {"domain": "domain", "person": "person", "person_visual": "person",
                                "phone": "account", "email": "account"}
 for k in ("fb_pixel", "google_ads", "ga4", "gtm", "ua", "tiktok_pixel", "yandex_metrika", "clarity", "hotjar",
@@ -79,7 +78,6 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
     from fakecollector.grouping.campaigns import connect
 
     with connect() as conn:
-        # ---- wybór materiałów
         if campaign_id is not None:
             ids = [r[0] for r in conn.execute("SELECT id FROM materials WHERE campaign_id = %s",
                                               (campaign_id,)).fetchall()]
@@ -131,7 +129,6 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
         edges.append({"id": f"{etype}:{src}->{dst}", "source": src, "target": dst, "type": etype,
                       "label": label, "weight": weight, "data": data})
 
-    # ---- operatorzy i kampanie
     for cid, label, summary, size, op, domains, persons in camps:
         node(f"campaign:{cid}", "campaign", label or f"kampania {cid}", campaign_id=cid, summary=summary,
              size=size, operator_group=op, domains=domains, persons=persons)
@@ -139,7 +136,6 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
             node(f"operator:{op}", "operator", f"Operator {op}", operator_group=op)
             edge(f"campaign:{cid}", f"operator:{op}", "operator", "ten sam operator")
 
-    # ---- materiały
     for (mid, source, title, domain, status, cid, assignment, ascore, persons, itype, created, nw,
          origin) in mats:
         node(f"material:{mid}", "material", _short(title or source or mid, 50), material_id=mid, source=source,
@@ -150,7 +146,6 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
             nodes[f"material:{mid}"]["group"] = f"campaign:{cid}"
             edge(f"material:{mid}", f"campaign:{cid}", "w_kampanii", assignment or "", ascore)
 
-    # ---- powiązania materiał–materiał (z przesłankami)
     for a, b, score, decision, reasons, op_score, op_reasons in links:
         if score >= ASSIGN:
             edge(f"material:{a}", f"material:{b}", "ta_sama_kampania", f"{score:.2f}", score, reasons=reasons)
@@ -160,7 +155,6 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
             edge(f"material:{a}", f"material:{b}", "ten_sam_operator", f"{op_score:.2f}", op_score,
                  reasons=op_reasons)
 
-    # ---- wspólne ślady
     if entities and keys:
         ctx = load_context()
         users: dict[tuple[str, str], set[str]] = defaultdict(set)
@@ -173,7 +167,7 @@ def build_graph(campaign_id: int | None = None, operator_group: int | None = Non
             if shared_only and len(mids) < 2 and kind != "domain":
                 continue
             if short_kind in CLONE_PRONE and ctx.ubiquitous(ctx.osint_df.get((short_kind, value), 0)):
-                continue        # szablon podszywanego serwisu – w grafie byłby tylko szumem
+                continue
             if added >= MAX_ENTITY_NODES:
                 break
             ntype = ENTITY_KIND[kind]

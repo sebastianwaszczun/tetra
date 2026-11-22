@@ -140,7 +140,6 @@ def _podsumuj(wyniki: list[tuple[str | None, str | None, str]]) -> dict[str, int
 
 
 def _wspolny_pomiar(pomiary: dict[str, Oceny], cfg: Progi) -> Oceny:
-    # Przy udanym kodowaniu używamy pierwszych dostępnych punktów, jak w analizuj_twarze.
     dostepne = (p for p in pomiary.values() if p.wektor is not None and p.skladowe[1] >= cfg["min_bok_px"])
     return next(dostepne, pomiary["buffalo_l"])
 
@@ -260,7 +259,6 @@ def ewaluuj_jakosc_twarzy(dane: Path, nieznane: tuple[str, ...], uwzglednij_szki
     czasy = defaultdict(list)
     dopasowania = defaultdict(list)
     proby = []
-    # Ładowanie i pierwszy przebieg CPU pozostają poza pomiarem czasu.
     sztuczny = np.zeros((112, 112, 3), np.uint8)
     norma_magface(sztuczny)
 

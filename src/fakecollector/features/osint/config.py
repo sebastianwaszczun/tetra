@@ -14,11 +14,9 @@ def _bool(name: str, default: bool) -> bool:
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
 
-# Cache wyników wzbogacania (RDAP/DNS/ASN/TLS/crt.sh) – jedna domena nie jest odpytywana dwa razy.
 CACHE_DIR = Path(os.getenv("OSINT_CACHE_DIR", _REPO_ROOT / "data" / "osint_cache"))
 CACHE_TTL_S = int(os.getenv("OSINT_CACHE_TTL_S", str(24 * 3600)))
 
-# Czasy i limity
 HTTP_TIMEOUT_S = float(os.getenv("OSINT_HTTP_TIMEOUT_S", "10"))
 ENRICH_TIMEOUT_S = float(os.getenv("OSINT_ENRICH_TIMEOUT_S", "8"))
 ENRICH_BUDGET_S = float(os.getenv("OSINT_ENRICH_BUDGET_S", "45"))
@@ -29,11 +27,9 @@ MAX_LIVE_SUBRESOURCES = int(os.getenv("OSINT_MAX_LIVE_SUBRESOURCES", "25"))
 MAX_BODY_BYTES = int(os.getenv("OSINT_MAX_BODY_BYTES", str(5 * 1024 * 1024)))
 MAX_UPLOAD_BYTES = int(os.getenv("OSINT_MAX_UPLOAD_BYTES", str(300 * 1024 * 1024)))
 
-# Przełączniki
-ENABLE_CT = _bool("OSINT_ENABLE_CT", True)            # crt.sh (Certificate Transparency)
-ALLOW_PRIVATE_TARGETS = _bool("OSINT_ALLOW_PRIVATE", False)  # ochrona SSRF dla trybu URL
+ENABLE_CT = _bool("OSINT_ENABLE_CT", True)
+ALLOW_PRIVATE_TARGETS = _bool("OSINT_ALLOW_PRIVATE", False)
 
-# Scamy często pokazują "białą stronę" botom. Udajemy telefon wchodzący z Facebooka.
 USER_AGENT = os.getenv(
     "OSINT_USER_AGENT",
     "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 "

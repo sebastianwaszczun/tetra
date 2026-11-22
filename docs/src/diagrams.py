@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 HERE = Path(__file__).parent
 OUT = HERE / "img"
-PX, SS = 230, 2                     # pikseli na cal w wyniku, nadpróbkowanie
+PX, SS = 230, 2
 INK, RED, LINE, MUTED, BG = "141210", "C9302B", "A89E90", "6B635A", "F3EBDC"
 
 
@@ -26,7 +26,6 @@ class Dia:
         self.rnd = random.Random(seed)
         self._fonts = {}
 
-    # --- geometria
     def p(self, x, y):
         return (x * self.k, y * self.k)
 
@@ -60,7 +59,6 @@ class Dia:
         pts.append(pts[0])
         return self._dense(pts)
 
-    # --- elementy
     def box(self, x, y, w, h, label=None, color=INK, fill=None, text=None, size=12, lw=0.024, tick=True, r=0.06):
         pts = self._wob(self._rrect(x, y, w, h, r), 0.006)
         if fill:
@@ -151,7 +149,6 @@ def chain(d, boxes, **kw):
         d.arrow(*mr(a), *ml(b), **kw)
 
 
-# ============================================================================ schematy
 def potok():
     d = Dia(7.0, 2.75, seed=3)
     h, y1 = .4, .55

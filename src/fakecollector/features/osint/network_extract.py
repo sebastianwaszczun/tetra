@@ -12,7 +12,6 @@ from .html_extract import _LIB, libs_from_urls
 from .utils import (cdn_of_ip, dedup, host_of, is_commodity, is_id_like, normalize_code,
                     path_template, query_schema, sha256, short_hash, split_host)
 
-# Nagłówki zmienne per-żądanie – nie wchodzą do odcisku zestawu nagłówków.
 _VOLATILE_HEADERS = {"date", "cf-ray", "content-length", "age", "expires", "last-modified", "etag",
                      "x-request-id", "x-amz-cf-id", "x-served-by", "x-cache", "x-cache-hits",
                      "x-timer", "set-cookie", "report-to", "nel", "server-timing", "cdn-requestid",
@@ -31,8 +30,6 @@ _STATIC_TYPES = {"script", "stylesheet", "image", "font", "media", "manifest"}
 _MEDIA_EXT = re.compile(r"\.(ts|m3u8|mp4|m4s|webm|mp3|aac|m4a|mpd)$", re.I)
 
 
-# Znane skrypty śledzące z popularnych serwisów – rozpoznawane po nazwie, gdy zapisana strona nie ma HAR-a
-# (przeglądarka przy zapisie gubi oryginalny adres, np. connect.facebook.net/…/fbevents.js).
 _THIRD_PARTY_JS = re.compile(r"^(fbevents|gtm|gtag|analytics|ga|clarity|uwt|bat|hotjar-\d+)\.js$")
 
 
@@ -90,7 +87,7 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
 
     def role(host: str) -> str:
         if "." not in host:
-            return "placeholder"        # np. https://delivered/?id= – niewypełniona zmienna kitu
+            return "placeholder"
         if host in landing_hosts:
             return "landing"
         if split_host(host)["registered_domain"] in landing_regs:
@@ -99,7 +96,6 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
             return "commodity"
         return "actor_third_party"
 
-    # ---- hosty, IP
     host_stats: dict[str, dict] = {}
     for r in res:
         h = host_of(r.url)
@@ -116,11 +112,10 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
         hosts.append({**st, "ips": sorted(st["ips"]), "registered_domain": sh["registered_domain"],
                       "platform": sh["platform"]})
 
-    # ---- łańcuch przekierowań (dokumenty + 3xx)
     chain = []
     for r in sorted(res, key=lambda x: x.started or ""):
         if r.source == "live":
-            continue                 # tryb live ma własny, dokładniejszy zapis skoków (live_chain)
+            continue
         is_doc = r.resource_type == "document" or (not r.resource_type and "html" in r.mime)
         is_redirect = r.status in (301, 302, 303, 307, 308)
         if is_doc or (is_redirect and role(host_of(r.url)) != "commodity"):
@@ -130,7 +125,6 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
                           "location": loc, "ip": r.ip, "source": r.source})
     chain = cap.live_chain + chain
 
-    # ---- odcisk HTTP głównego dokumentu
     main = next((r for r in res if host_of(r.url) in landing_hosts and r.resource_type == "document"
                  and r.status and r.status < 400 and r.headers), None) \
         or next((r for r in res if host_of(r.url) in landing_hosts and r.headers), None)
@@ -163,12 +157,10 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
                     stacks[f"{k}: {hd[k]}"] += 1
     http["server_stack"] = sorted(stacks)
 
-    # ---- ciasteczka
     cookies = sorted({c for r in res for c in r.cookies if c and c != "[REDACTED]"})
     http["cookies"] = cookies
     http["distinct_cookies"] = [c for c in cookies if c.lower() not in _GENERIC_COOKIES]
 
-    # ---- endpointy API / beacony (aktor, nie Google/Meta)
     endpoints = {}
     for r in res:
         h = host_of(r.url)
@@ -195,11 +187,9 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
             e["statuses"].add(r.status)
     endpoints_out = [{**e, "hosts": sorted(e["hosts"]), "statuses": sorted(e["statuses"])} for e in endpoints.values()]
 
-    # ---- zasoby: skrypty, style, obrazy, katalogi kitu
     scripts, styles, images = [], [], []
     kit_dirs, families, layout = Counter(), Counter(), Counter()
     favicon = None
-    # treść plików z popularnych serwisów (Facebook, Google…) – ich kopie z zapisanej strony to nie kit
     commodity_bodies = {r.body_sha256 for r in res
                         if r.body_sha256 and role(host_of(r.url)) == "commodity"}
     for r in res + [x for x in cap.resources if x.url.startswith("saved:")]:
@@ -225,8 +215,6 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
         if rtype in ("script", "stylesheet"):
             is_vendor = (rl == "commodity" or bool(_LIB.search(fname))
                          or ".min." in fname and rl != "landing"
-                         # kopia z zapisanej strony (adres zgubiony): ta sama treść co plik z FB/Google
-                         # albo nazwa znanego skryptu śledzącego – to nie własny skrypt kitu
                          or rl == "saved_page" and (r.body_sha256 in commodity_bodies
                                                     or bool(_THIRD_PARTY_JS.match(fname))))
             norm_hash = None
@@ -238,16 +226,14 @@ def extract_network(cap: Capture, landing_hosts: set[str]) -> dict:
                     "path_template": path_template(sp.path) if h else None}
             (scripts if rtype == "script" else styles).append(item)
         elif rtype == "image" and rl in ("landing", "first_party", "actor_third_party", "saved_page") and r.body_sha256:
-            if (r.size or 0) >= 1024:         # pomijamy piksele 1x1 i ikonki
+            if (r.size or 0) >= 1024:
                 images.append({"name": fname[:80], "sha256": r.body_sha256[:32], "size": r.size, "role": rl})
 
-    # ---- identyfikatory trackerów z URL-i żądań
     tracker_ids = []
     for r in res:
         for kind, val in trackers.ids_from_url(r.url):
             tracker_ids.append((kind, val))
 
-    # ---- hosty mediów (m3u8 / wideo)
     media_hosts = sorted({host_of(r.url) for r in res if r.resource_type == "media" or ".m3u8" in r.url
                           or r.mime.startswith("video/")} | {host_of(s) for s in cap.streams})
 

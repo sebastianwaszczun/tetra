@@ -13,7 +13,7 @@ from psycopg.types.json import Jsonb
 
 from .model import Ocena, ReklamaMeta
 
-BLOKADA = 7_413_001  # klucz pg_advisory_lock: jeden skan naraz (harmonogram i przycisk w API)
+BLOKADA = 7_413_001
 
 SCHEMAT = """
 CREATE TABLE IF NOT EXISTS adlib_reklamy (
@@ -97,7 +97,6 @@ class Magazyn:
                 conn.execute("SELECT pg_advisory_unlock(%s)", (BLOKADA,))
             conn.close()
 
-    # ------------------------------------------------------------------ reklamy
     def zapisz_reklamy(self, reklamy: list[ReklamaMeta], rekordy: dict[str, dict], opis_zapytania: str,
                        skan_id: int) -> set[str]:
         """Dopisuje reklamy albo odświeża znane. Zwraca id reklam widzianych pierwszy raz."""
@@ -159,7 +158,6 @@ class Magazyn:
                 FROM adlib_reklamy {warunek}
                 ORDER BY pierwsze_wykrycie DESC, wynik DESC NULLS LAST LIMIT %s""", parametry).fetchall()
 
-    # ------------------------------------------------------------------ tropy
     def dodaj_trop(self, rodzaj: str, wartosc: str, zrodlo: str, opis: str = "") -> None:
         self.conn.execute(
             "INSERT INTO adlib_tropy (rodzaj, wartosc, zrodlo, opis) VALUES (%s, %s, %s, %s) "
@@ -180,7 +178,6 @@ class Magazyn:
             "AND coalesce(ostatnie_trafienie, dodano) > now() - make_interval(days => %s) "
             "ORDER BY coalesce(ostatnie_trafienie, dodano) DESC LIMIT %s", (wygasanie_dni, limit)).fetchall()]
 
-    # ------------------------------------------------------------------ skany
     def nowy_skan(self, tryb: str, wyzwalacz: str) -> int:
         return self.conn.execute("INSERT INTO adlib_skany (tryb, wyzwalacz) VALUES (%s, %s) RETURNING id",
                                  (tryb, wyzwalacz)).fetchone()["id"]

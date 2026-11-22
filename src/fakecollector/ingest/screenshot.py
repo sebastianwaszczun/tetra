@@ -9,10 +9,9 @@ from pathlib import Path
 log = logging.getLogger(__name__)
 
 OCR_LANG = os.environ.get("OCR_LANG", "pol+eng")
-TILE_HEIGHT = 2500      # wysokie zrzuty całej strony czytamy w kawałkach
-MAX_TILES = 12          # najwyżej ~30 000 px wysokości
+TILE_HEIGHT = 2500
+MAX_TILES = 12
 
-# Domeny z OCR: tesseract często wstawia spacje wokół kropek ("civicdaybook . live")
 OCR_URL_RE = re.compile(
     r"(?:https?://\S+|www\.\S+|\b[a-z0-9][a-z0-9-]{1,62}\s?\.\s?(?:pl|com|net|org|eu|info|shop|online|xyz|"
     r"top|site|store|app|io|me|ly|live|click|pro|icu|life|biz|club)\b(?:/\S*)?)", re.I)
@@ -29,7 +28,7 @@ def ocr_image(path: str | Path, lang: str = OCR_LANG) -> str:
     except Exception as exc:
         log.warning("Nie można otworzyć obrazu %s: %s", path, exc)
         return ""
-    if img.width < 1000:  # małe zrzuty powiększamy – OCR czyta wtedy dużo lepiej
+    if img.width < 1000:
         scale = 1000 / img.width
         img = img.resize((1000, int(img.height * scale)))
     parts = []

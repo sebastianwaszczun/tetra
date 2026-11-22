@@ -66,7 +66,6 @@ def generuj_warianty(obraz: Image.Image, ziarno: int = 0) -> Iterator[Wariant]:
     kolaz.paste(mini, (0, 0))
     kolaz.paste(ImageOps.mirror(mini), (w - mini.width, h - mini.height))
     yield Wariant("kolaz", "nieobiecane", kolaz)
-    # Dla RGB bez maski zachowujemy środkowy wycinek jako przybliżenie pierwszego planu.
     tlo = Image.new("RGB", (w, h), kolor)
     if rgba is not None and alfa.getextrema()[0] < 255:
         tlo.paste(rgba, mask=alfa)

@@ -8,7 +8,6 @@ from __future__ import annotations
 import re
 from urllib.parse import parse_qsl, unquote, urlsplit
 
-# (typ, regex w tekście HTML/JS) – grupa 1 = identyfikator
 TEXT_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("fb_pixel", re.compile(r"fbq\(\s*['\"]init['\"]\s*,\s*['\"]?(\d{10,20})")),
     ("fb_pixel", re.compile(r"facebook\.com/tr\?[^\"'\s>]*\bid=(\d{10,20})")),
@@ -33,7 +32,6 @@ TEXT_PATTERNS: list[tuple[str, re.Pattern]] = [
     ("adsense", re.compile(r"\b(ca-pub-\d{10,20})\b")),
 ]
 
-# (typ, host-sufiks, regex na ścieżce+query) – identyfikatory w URL-ach żądań z HAR
 URL_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("fb_pixel", "facebook.net", re.compile(r"/signals/config/(\d{10,20})")),
     ("fb_pixel", "facebook.com", re.compile(r"/tr/?\?(?:.*&)?id=(\d{10,20})")),
@@ -50,18 +48,16 @@ URL_PATTERNS: list[tuple[str, str, re.Pattern]] = [
     ("clarity", "clarity.ms", re.compile(r"/tag/([a-z0-9]{8,12})")),
 ]
 
-# Parametry, które Meta Ads wstawia z makr {{ad.id}} itd. – zdradzają konto/kampanię reklamową.
 FB_AD_PARAMS = {
     "ad_id": "fb_ad_id", "adid": "fb_ad_id", "fb_ad_id": "fb_ad_id",
     "adset_id": "fb_adset_id", "campaign_id": "fb_campaign_id", "fb_campaign_id": "fb_campaign_id",
-    "utm_id": "fb_campaign_id",                  # w FB utm_id = {{campaign.id}} (gdy 15–20 cyfr)
-    "utm_term": "fb_adset_id", "utm_content": "fb_ad_id",   # tylko gdy wartość to 15–20 cyfr
+    "utm_id": "fb_campaign_id",
+    "utm_term": "fb_adset_id", "utm_content": "fb_ad_id",
     "pxl": "fb_pixel", "fbpx": "fb_pixel", "pixel": "fb_pixel", "pixel_id": "fb_pixel",
 }
 NAMING_PARAMS = ("adset_name", "ad_name", "campaign_name", "acc", "utm_campaign", "utm_creative",
                  "placement", "utm_placement", "site_source_name", "creative", "buyer", "source")
 
-# Parametry wskazujące silnik TDS / trackera afiliacyjnego.
 TDS_FAMILIES: list[tuple[str, set[str]]] = [
     ("keitaro", {"_trk", "_camp_id", "land_id", "lpkey", "subid", "_subid"}),
     ("binom", {"lp", "camp_id", "trck"}),
@@ -71,7 +67,6 @@ TDS_FAMILIES: list[tuple[str, set[str]]] = [
     ("utm_visit_kit", {"utm_visit"}),
 ]
 _KEITARO_SUBID = re.compile(r"^[0-9a-v]{20}$")
-# Identyfikatory kampanii wewnątrz TDS (stałe dla kampanii; land_id rotuje między landingami).
 TDS_ID_PARAMS = ("_trk", "_camp_id", "camp_id", "trafficsource", "user_id", "land_id", "lp")
 SECRET_PARAMS = {"access_token", "token", "fb_access_token", "auth", "session", "sid", "password"}
 
@@ -97,7 +92,7 @@ def ids_from_url(url: str) -> list[tuple[str, str]]:
             for m in rx.finditer(tail):
                 v = m.group(1)
                 if kind == "google_ads" and v.isdigit():
-                    v = "AW-" + v          # numer konwersji = konto AW-<numer>
+                    v = "AW-" + v
                 out.append((kind, v))
     return out
 
@@ -134,6 +129,6 @@ def analyze_params(url: str) -> dict:
     tds_ids = {k: unquote(v)[:60] for k, v in pairs if k in TDS_ID_PARAMS}
     cid = click_ids.get("clickid") or click_ids.get("subid")
     if cid and _KEITARO_SUBID.match(cid) and "keitaro" not in families:
-        families.append("keitaro")          # format sub_id Keitaro: 20 znaków [0-9a-v]
+        families.append("keitaro")
     return {"ad_ids": ad_ids, "naming": naming, "click_ids": click_ids,
             "tds_families": families, "tds_ids": tds_ids, "secret_params": secrets}

@@ -63,7 +63,6 @@ def _orientacja_i_tlo(obraz: Image.Image) -> Image.Image:
 
 def _dlugosc_pasa(obraz: Image.Image, bok: int, limit: int) -> int:
     w, h = obraz.size
-    # Maksymalny jednolity prostokąt przy krawędzi wyznaczamy binarnie.
     dol, gora = 0, limit
     while dol < gora:
         n = (dol + gora + 1) // 2
@@ -78,11 +77,9 @@ def _dlugosc_pasa(obraz: Image.Image, bok: int, limit: int) -> int:
 def _obetnij_ramki(obraz: Image.Image, udzial: float) -> tuple[Image.Image, tuple[int, int, int, int]]:
     w, h = obraz.size
     maks_w, maks_h = int(w * udzial), int(h * udzial)
-    # Pas sięgający poza limit nie ma widocznej granicy w dopuszczalnym zakresie.
     limity = (maks_w, maks_h, maks_w, maks_h)
     pasy = [_dlugosc_pasa(obraz, bok, limit + 1) if limit else 0 for bok, limit in enumerate(limity)]
     l, g, p, d = (pas if pas <= limit else 0 for pas, limit in zip(pasy, limity))
-    # Po odjęciu pasów poziomego koloru można odsłonić inne kolory pasów pionowych.
     if (g or d) and h - g - d > 0:
         srodek = obraz.crop((0, g, w, h - d))
         lewy, prawy = (_dlugosc_pasa(srodek, bok, maks_w + 1) if maks_w else 0 for bok in (0, 2))
@@ -144,7 +141,6 @@ def przygotuj_z_pelnym_rastrem(obraz: Obraz) -> tuple[Image.Image | None, CechyO
             finally:
                 if klatka:
                     obraz.seek(klatka)
-            # Dla obiektu w pamięci oryginalne bajty pliku nie są częścią kontraktu.
             digest = sha256(f"PIL RGB {rgb.width}x{rgb.height}\\0".encode("ascii"))
             digest.update(rgb.tobytes())
             cechy.sha256 = digest.hexdigest()

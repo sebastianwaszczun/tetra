@@ -6,7 +6,7 @@ from typing import Any
 
 from .model import ReklamaMeta, Zapytanie
 
-MAKS_STRON_W_ZAPYTANIU = 10  # limit search_page_ids w ads_archive
+MAKS_STRON_W_ZAPYTANIU = 10
 
 
 def _norm(fraza: str) -> str:

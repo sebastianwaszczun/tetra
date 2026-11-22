@@ -5,7 +5,6 @@ import { Loading } from './components/ui.jsx'
 import { href, useRoute } from './lib/route.js'
 import Home from './pages/Home.jsx'
 
-// Widoki kartoteki ładowane na żądanie (graf i jego biblioteki nie obciążają strony głównej).
 const CampaignsPage = lazy(() => import('./pages/Campaigns.jsx'))
 const CampaignPage = lazy(() => import('./pages/Campaign.jsx'))
 const OperatorPage = lazy(() => import('./pages/Operator.jsx'))

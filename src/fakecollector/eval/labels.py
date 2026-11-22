@@ -69,12 +69,11 @@ def draft_labels(path: Path | str = LABELS_FILE, force: bool = False) -> dict:
     seen: set[str] = set()
     items = []
     for src, cid, label, op, assignment, title in rows:
-        if src in seen:            # ten sam folder dodany dwa razy – liczymy raz
+        if src in seen:
             continue
         seen.add(src)
         lead = (label or title or src).split(" · ")[0]
         items.append({"source": src, "cid": cid, "lead": lead, "op": op, "assignment": assignment})
-    # podpowiedzi: ta sama osoba w różnych kampaniach systemu – człowiek decyduje, czy to jedna kampania
     by_lead = defaultdict(set)
     for it in items:
         by_lead[slug(it["lead"])].add(it["cid"])

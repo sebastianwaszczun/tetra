@@ -97,7 +97,6 @@ def test_pelny_skan_tropy_i_deduplikacja(cfg, magazyn, tmp_path):
     assert magazyn.strony_tropow() == ["P1"]
     assert "Vitaflex Max" in magazyn.frazy_z_wynikow(7, 10)
 
-    # Drugi skan: znana reklama A nie idzie drugi raz do analizy, nowa reklama strony P1 idzie jako trop.
     nowa = rekord("C", page_id="P1", tresc=ZWYKLA)
     klient.odpowiedzi = {"strony:P1": [nowa, scam], "fraza:pasywny dochód": [scam, zwykla]}
     w2 = s.skanuj("test")

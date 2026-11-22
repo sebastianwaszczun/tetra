@@ -1,11 +1,8 @@
-# Wspólne ograniczenia wersji dla całego środowiska.
-# facetorch 0.6.x wymaga torch<2.4 – trzymamy zgodny zestaw CPU.
 torch==2.3.1
 torchvision==0.18.1
 torchaudio==2.3.1
 numpy<2
 
-# Pakiety z epoki torch 2.3 / numpy 1.x – zgodny zestaw, żeby pip nie szukał godzinami.
 transformers>=4.40,<4.47
 sentence-transformers>=3.0,<3.4
 open_clip_torch>=2.32,<2.33

@@ -1,5 +1,3 @@
-// Elementy wspólne stron kartoteki.
-
 import { Badge, Box, Chips, SIGNALS, materialy, shortDate } from '../components/ui.jsx'
 import { href } from '../lib/route.js'
 

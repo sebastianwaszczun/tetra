@@ -72,7 +72,6 @@ def extract_html(html: str, url: str | None) -> dict:
     can = soup.find("link", rel=lambda r: r and "canonical" in r)
     out["canonical"] = can.get("href") if can else None
 
-    # ---- skrypty
     scripts, inline_hashes, inline_texts = [], [], []
     for s in soup.find_all("script"):
         if s.get("src"):
@@ -87,7 +86,6 @@ def extract_html(html: str, url: str | None) -> dict:
     out["scripts"] = dedup(scripts)
     out["inline_script_hashes"] = dedup(inline_hashes)
 
-    # ---- style / ikony / iframe
     css, icons = [], []
     for ln in soup.find_all("link", href=True):
         rel = " ".join(ln.get("rel") or []).lower()
@@ -99,7 +97,6 @@ def extract_html(html: str, url: str | None) -> dict:
     out["favicon_refs"] = dedup(icons)
     out["iframes"] = dedup(_resolve(base, f["src"]) for f in soup.find_all("iframe", src=True))
 
-    # ---- formularze (szablon akcji + nazwy pól – identyfikują backend zbierający leady)
     forms = []
     for f in soup.find_all("form"):
         action = _resolve(base, f.get("action") or "") if f.get("action") else ""
@@ -118,7 +115,6 @@ def extract_html(html: str, url: str | None) -> dict:
         })
     out["forms"] = forms
 
-    # ---- linki wychodzące / CTA
     hrefs = [a["href"] for a in soup.find_all("a", href=True)]
     abs_links = [_resolve(base, h) for h in hrefs if not h.startswith(("#", "javascript:", "mailto:", "tel:"))]
     out_hosts = Counter(host_of(h) for h in abs_links if h.startswith("http"))
@@ -127,7 +123,6 @@ def extract_html(html: str, url: str | None) -> dict:
     out["link_count"] = len(hrefs)
     out["self_link_ratio"] = round(sum(1 for h in hrefs if h.startswith("#") or h in ("", "/")) / len(hrefs), 3) if hrefs else None
 
-    # ---- kontakty i portfele
     text = soup.get_text(" ", strip=True)
     tel = [h[4:] for h in hrefs if h.startswith("tel:")]
     out["phones"] = dedup(re.sub(r"[^\d+]", "", p) for p in _PHONE.findall(text) + tel)[:20]
@@ -143,10 +138,8 @@ def extract_html(html: str, url: str | None) -> dict:
             wallets.append(f"{kind}:{w}")
     out["crypto_wallets"] = dedup(wallets)[:20]
 
-    # ---- identyfikatory trackerów w treści
     out["tracker_ids"] = dedup(trackers.ids_from_text(html))
 
-    # ---- przekierowania po stronie klienta
     client_redirects = []
     for m in soup.find_all("meta", attrs={"http-equiv": re.compile("refresh", re.I)}):
         mm = _META_REFRESH.search(m.get("content") or "")
@@ -157,7 +150,6 @@ def extract_html(html: str, url: str | None) -> dict:
             client_redirects.append({"type": "js", "url": _resolve(base, mm.group(1) or mm.group(2))})
     out["client_redirects"] = dedup(client_redirects)[:10]
 
-    # ---- szkielet DOM (simhash) – podobny szablon = mała odległość Hamminga
     tags = [t for t in soup.find_all(True)]
     seq = [t.name for t in tags]
     shingles = [" ".join(seq[i:i + 4]) for i in range(max(0, len(seq) - 3))]
@@ -165,13 +157,12 @@ def extract_html(html: str, url: str | None) -> dict:
     out["dom_simhash"] = simhash64(shingles)
     out["dom_tag_count"] = len(tags)
 
-    # ---- klasy CSS (wykrycie zaciemniania nazw klas)
     classes = [c for t in tags for c in (t.get("class") or [])]
     obf = sum(1 for c in classes if _OBF_CLASS.match(c))
     out["css_class_count"] = len(classes)
     out["obfuscated_class_ratio"] = round(obf / len(classes), 3) if classes else 0.0
     out["html_style"] = (soup.html.get("style") if soup.html else None)
-    out["_inline_js"] = inline_texts  # do analizy cech kitu, usuwane z rekordu
+    out["_inline_js"] = inline_texts
     return out
 
 
@@ -187,9 +178,6 @@ def libs_from_urls(urls: list[str]) -> list[str]:
     return dedup(libs)
 
 
-# --------------------------------------------------------------------------- cechy kitu
-# Zachowania typowe dla zestawów (kitów) stron scamowych. Pojedynczo słabe, ale ich
-# kombinacja dobrze odróżnia rodziny szablonów. Każda cecha = (nazwa, regex, opis).
 KIT_TRAITS: list[tuple[str, re.Pattern, str]] = [
     ("hue_rotate_evasion", re.compile(r"filter\s*:\s*hue-rotate\(\s*\d+deg\)", re.I),
      "losowy hue-rotate na <html> – psuje hashe percepcyjne zrzutów"),

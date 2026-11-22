@@ -98,8 +98,6 @@ def connect():
     return _cm()
 
 
-# ============================================================================ krawędzie
-
 def save_link(r: PairResult) -> None:
     a, b = sorted((r.a, r.b))
     j = lambda v: json.dumps(v, ensure_ascii=False, default=str)  # noqa: E731
@@ -141,8 +139,6 @@ def compare_with_candidates(material_id: str, cache: dict | None = None, ctx: Co
     return sorted(out, key=lambda r: -r.score)
 
 
-# ============================================================================ kampanie
-
 def _campaign_of(conn, ids: list[str]) -> dict[str, int | None]:
     rows = conn.execute("SELECT id, campaign_id FROM materials WHERE id = ANY(%s)", (ids,)).fetchall()
     return dict(rows)
@@ -182,8 +178,6 @@ def refresh_campaign(campaign_id: int) -> None:
             for r in (reasons or [])[:2]:
                 if r not in sample and len(sample) < 8:
                     sample.append(r)
-        # bohater kampanii: osoba najczęściej wymieniana w tekście każdego materiału
-        # (np. Stanowski / Sekielski, a nie Glapiński, który pojawia się w obu artykułach pobocznie)
         leads: Counter = Counter()
         for (counts,) in conn.execute("""SELECT data->'persons' FROM material_features
                                          WHERE module = 'text' AND material_id = ANY(%s)""", (ids,)).fetchall():
@@ -236,7 +230,6 @@ def assign_material(material_id: str) -> dict[str, Any]:
         if ranked and ranked[0][1].score >= ASSIGN:
             cid, best = ranked[0]
             status = "przypisany"
-            # materiał pewnie pasuje do kilku kampanii -> to jedna kampania: scalamy
             for other_cid, r in ranked[1:]:
                 if r.score >= ASSIGN:
                     conn.execute("UPDATE materials SET campaign_id=%s WHERE campaign_id=%s", (cid, other_cid))
@@ -282,7 +275,7 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
     for n, mid in enumerate(ids, 1):
         for cand in find_candidates(mid, limit=CANDIDATES_PER_MATERIAL):
             key = tuple(sorted((mid, cand["id"])))
-            if cand["id"] not in scope or key in edges:      # każdą parę porównujemy raz
+            if cand["id"] not in scope or key in edges:
                 continue
             r = compare_materials(mid, cand["id"], cache, ctx)
             if write:
@@ -303,10 +296,10 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
     for (a, b), r in edges.items():
         if r.score >= ASSIGN and (a, b) not in rejected:
             parent[find(a)] = find(b)
-    for a, b in confirmed:                       # decyzja analityka: para zawsze w jednej kampanii
+    for a, b in confirmed:
         if a in parent and b in parent:
             parent[find(a)] = find(b)
-    for d, orig in dups.items():                 # duplikat zawsze w kampanii oryginału
+    for d, orig in dups.items():
         if d in parent and orig in parent:
             parent[find(d)] = find(orig)
 
@@ -315,7 +308,7 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
         groups[find(i)].append(i)
     clusters = [g for g in groups.values() if len(g) > 1]
     singles = [g[0] for g in groups.values() if len(g) == 1]
-    review: dict[str, tuple[str, float]] = {}     # pojedynczy materiał -> (sąsiad w kampanii, wynik)
+    review: dict[str, tuple[str, float]] = {}
     member_of = {m: tuple(sorted(g)) for g in clusters for m in g}
     for (a, b), r in edges.items():
         if (a, b) in rejected:
@@ -325,7 +318,7 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
                 if x not in review or r.score > review[x][1]:
                     review[x] = (y, r.score)
 
-    op_parent = {i: find(i) for i in ids}          # kampanie + wspólna infrastruktura
+    op_parent = {i: find(i) for i in ids}
 
     def op_find(x: str) -> str:
         while op_parent[x] != x:
@@ -341,7 +334,7 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
     for i in ids:
         op_groups[op_find(find(i))].add(i)
     operator_clusters = [sorted(g) for g in op_groups.values()
-                         if len({find(m) for m in g}) > 1]       # operator z co najmniej 2 kampaniami
+                         if len({find(m) for m in g}) > 1]
 
     result = {"materials": len(ids), "edges": len(edges),
               "strong_edges": sum(r.score >= ASSIGN for r in edges.values()),
@@ -360,7 +353,6 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
         used: set[int] = set()
 
         def stable_id(members: list[str]) -> int:
-            # zachowaj numer kampanii, jeśli większość materiałów już w niej była
             votes = Counter(previous.get(m) for m in members if previous.get(m) is not None)
             for cid, _ in votes.most_common():
                 if cid not in used:
@@ -390,7 +382,6 @@ def rebuild(ids: list[str] | None = None, write: bool = True, progress=None) -> 
             touched.add(cid)
         from .decisions import apply_labels
         apply_labels(conn)
-        # kampanie, które straciły wszystkie materiały
         conn.execute("""DELETE FROM campaigns c WHERE method = %s
                         AND NOT EXISTS (SELECT 1 FROM materials m WHERE m.campaign_id = c.id)""", (METHOD,))
     for cid in touched:
@@ -430,8 +421,6 @@ def refresh_operators() -> list[list[int]]:
                 out.append(sorted(members))
     return sorted(out, key=len, reverse=True)
 
-
-# ============================================================================ odczyt
 
 _CAMPAIGN_COLS = ("id", "label", "summary", "size", "persons", "domains", "brands", "evidence",
                   "first_seen", "last_seen", "created_at", "updated_at", "operator_group")

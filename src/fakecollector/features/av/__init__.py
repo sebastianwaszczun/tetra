@@ -34,10 +34,10 @@ import numpy as np
 log = logging.getLogger(__name__)
 
 SR = 16000
-MAX_SECONDS = float(os.environ.get("AV_MAX_SECONDS", "600"))          # dłuższe pliki przycinamy
-MAX_ASR_SECONDS = float(os.environ.get("AV_MAX_ASR_SECONDS", "300"))  # transkrypcja jest najwolniejsza
+MAX_SECONDS = float(os.environ.get("AV_MAX_SECONDS", "600"))
+MAX_ASR_SECONDS = float(os.environ.get("AV_MAX_ASR_SECONDS", "300"))
 WHISPER_MODEL = os.environ.get("WHISPER_MODEL", "openai/whisper-small")
-WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE") or None         # None = wykryj sam
+WHISPER_LANGUAGE = os.environ.get("WHISPER_LANGUAGE") or None
 VOICE_MODEL = "speechbrain/spkrec-ecapa-voxceleb"
 MODELS_DIR = Path(os.environ.get("SPEECHBRAIN_HOME", "/models/speechbrain"))
 REFERENCE_DIR = Path(os.environ.get("REFERENCE_DIR", "data/reference_people"))
@@ -48,40 +48,37 @@ AUDIO_EXT = {".mp3", ".wav", ".m4a", ".ogg", ".opus", ".aac", ".flac"}
 SCREEN_RECORDING_RE = re.compile(
     r"screen.?recording|nagr(ywanie|anie).?ekranu|rpreplay|screen.?record|zrzut.?ekranu.?wideo|screencast", re.I)
 
-# Typowe „halucynacje” Whispera na muzyce i ciszy
 HALLUCINATION_RE = re.compile(
     r"[^.!?\n]*(amara\.org|napisy (wykonane|stworzone|przygotowane)|dzięki za (obejrzenie|uwagę)|"
     r"dziękuję za (obejrzenie|uwagę)|subskrybuj|thanks for watching|subtitles by)[^.!?\n]*[.!?]?", re.I)
 
-
-# ============================================================================ wynik
 
 @dataclass
 class MediaFeatures:
     """Cechy jednego pliku wideo albo audio."""
     path: str
     name: str
-    kind: str                                   # video / audio
-    screen_recording: bool = False              # nagranie ekranu telefonu (UI zamiast samej reklamy)
+    kind: str
+    screen_recording: bool = False
     duration: float = 0.0
     width: int | None = None
     height: int | None = None
     fps: float | None = None
     video_codec: str | None = None
     audio_codec: str | None = None
-    encoder: str | None = None                  # np. „Lavf58.76.100”, „CapCut” – program, który zapisał plik
+    encoder: str | None = None
     creation_time: str | None = None
     has_audio: bool = False
     speech_seconds: float = 0.0
     speech_ratio: float = 0.0
     transcript: str = ""
     transcript_model: str | None = None
-    onscreen_text: str = ""                     # OCR kilku klatek
-    voice_emb: list[float] | None = None        # 192 liczby, znormalizowane
-    voice_windows: int = 0                      # z ilu 3-sekundowych kawałków mowy liczony
+    onscreen_text: str = ""
+    voice_emb: list[float] | None = None
+    voice_windows: int = 0
     audio_fp_hashes: list[int] = field(default_factory=list)
     audio_fp_times: list[int] = field(default_factory=list)
-    video_fp: list[str] = field(default_factory=list)   # dHash klatek (hex, 16 znaków)
+    video_fp: list[str] = field(default_factory=list)
     confidence: float = 1.0
     errors: list[str] = field(default_factory=list)
 
@@ -95,8 +92,6 @@ class MediaFeatures:
                 d[k] = f"<{len(v)} liczb>" if v else None
         return d
 
-
-# ============================================================================ dekodowanie i metadane
 
 def _run(cmd: list[str], timeout: int = 600) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, timeout=timeout)
@@ -142,8 +137,6 @@ def load_audio(path: str | Path, max_seconds: float = MAX_SECONDS) -> np.ndarray
     return np.frombuffer(r.stdout, dtype=np.float32).copy()
 
 
-# ============================================================================ mowa (VAD)
-
 def speech_segments(y: np.ndarray, min_len: float = 0.4, max_gap: float = 0.3) -> list[tuple[float, float]]:
     """Fragmenty z głosem na podstawie głośności (bez modelu).
 
@@ -157,7 +150,7 @@ def speech_segments(y: np.ndarray, min_len: float = 0.4, max_gap: float = 0.3) -
     starts = np.arange(0, len(y) - win + 1, hop)
     energy = (cs[starts + win] - cs[starts]) / win
     db = 10 * np.log10(energy + 1e-10)
-    if db.max() < -55:  # cisza
+    if db.max() < -55:
         return []
     thr = max(np.percentile(db, 10) + 10, -50.0)
     active = db > thr
@@ -171,10 +164,8 @@ def speech_segments(y: np.ndarray, min_len: float = 0.4, max_gap: float = 0.3) -
     return [(round(s, 2), round(e, 2)) for s, e in segs if e - s >= min_len]
 
 
-# ============================================================================ odcisk dźwięku
-
-FP_NFFT, FP_HOP = 1024, 256          # 64 ms okno, 16 ms krok (mniejszy krok = odporność na przesunięcie po kompresji)
-FP_FMIN, FP_FMAX = 10, 300           # pasmo ok. 150 Hz – 4,7 kHz (mowa i melodia)
+FP_NFFT, FP_HOP = 1024, 256
+FP_FMIN, FP_FMAX = 10, 300
 FP_PEAKS_PER_SEC = 15
 FP_FANOUT, FP_MAX_DT, FP_MAX_DF = 3, 63, 60
 
@@ -205,7 +196,6 @@ def audio_fingerprint(y: np.ndarray, max_seconds: float = 300) -> tuple[list[int
     if len(t_idx) == 0:
         return [], []
     mags = S[t_idx, f_idx]
-    # gęstość: najwyżej FP_PEAKS_PER_SEC najmocniejszych szczytów na sekundę
     frames_per_sec = SR / FP_HOP
     bucket = (t_idx / frames_per_sec).astype(int)
     order = np.lexsort((-mags, bucket))
@@ -254,19 +244,14 @@ def compare_audio_fp(ha: list[int], ta: list[int], hb: list[int], tb: list[int])
     idx_b = np.concatenate([np.arange(l, h) for l, h in zip(lo[counts > 0], hi[counts > 0])])
     offsets = tb_s[idx_b] - ta_[idx_a]
     vals, cnt = np.unique(offsets, return_counts=True)
-    # dopuszczamy ±1 ramkę rozjazdu
     k = int(np.argmax(cnt))
     near = int(cnt[np.abs(vals - vals[k]) <= 1].sum())
     shorter = min(len(ha_), len(hb_))
-    # pomiar na danych: ta sama ścieżka po przycięciu, kompresji MP3/AAC, zmianie głośności i z szumem
-    # = 31–45% pasujących par; różne nagrania = 0,0% (2–4 przypadkowe trafienia). 30% = pewne.
     score = float(min(1.0, near / (0.30 * shorter)))
-    if near < 12:   # kilka przypadkowych trafień to nie dopasowanie
+    if near < 12:
         score = 0.0
     return {"score": round(score, 3), "matches": near, "offset_s": round(float(vals[k]) * FP_HOP / SR, 2)}
 
-
-# ============================================================================ odcisk obrazu
 
 VIDEO_FP_FPS = 2
 MAX_VIDEO_FRAMES = 600
@@ -308,8 +293,6 @@ def compare_video_fp(a: list[str], b: list[str], max_dist: int = 10) -> dict[str
     return {"score": round(score, 3), "frames_a": round(frac_a, 3), "frames_b": round(frac_b, 3)}
 
 
-# ============================================================================ modele (ładowane raz)
-
 _lock = threading.Lock()
 _voice_model: Any = None
 _asr: Any = None
@@ -329,7 +312,7 @@ def _get_voice_model():
             _quiet_speechbrain()
             try:
                 from speechbrain.inference.speaker import EncoderClassifier
-            except ImportError:  # speechbrain < 1.0
+            except ImportError:
                 from speechbrain.pretrained import EncoderClassifier  # type: ignore
             _quiet_speechbrain()
             _voice_model = EncoderClassifier.from_hparams(
@@ -364,7 +347,7 @@ def _get_asr():
     global _asr
     with _lock:
         if _asr is None:
-            try:   # szybsza wersja, jeśli ktoś ją doinstaluje
+            try:
                 from faster_whisper import WhisperModel
                 size = WHISPER_MODEL.split("whisper-")[-1]
                 _asr = ("faster-whisper:" + size,
@@ -394,11 +377,9 @@ def transcribe(y: np.ndarray) -> tuple[str, str]:
         out = model({"raw": y, "sampling_rate": SR}, generate_kwargs=kwargs, batch_size=4)
         text = out["text"] if isinstance(out, dict) else " ".join(o["text"] for o in out)
     text = HALLUCINATION_RE.sub(" ", text)
-    text = re.sub(r"\b(\w+)( \1\b){3,}", r"\1", text)      # „tak tak tak tak” -> „tak”
+    text = re.sub(r"\b(\w+)( \1\b){3,}", r"\1", text)
     return " ".join(text.split()), name
 
-
-# ============================================================================ tekst na ekranie
 
 def onscreen_text(path: str | Path, duration: float, n: int = 6, workdir: Path | None = None) -> str:
     """OCR kilku klatek rozłożonych równo w czasie. Powtarzające się linie liczymy raz."""
@@ -416,7 +397,7 @@ def onscreen_text(path: str | Path, duration: float, n: int = 6, workdir: Path |
                 continue
             try:
                 text = ocr_image(frame)
-            except Exception as exc:  # brak tesseracta itp.
+            except Exception as exc:
                 log.warning("OCR klatki: %s", exc)
                 return ""
             for line in text.splitlines():
@@ -426,8 +407,6 @@ def onscreen_text(path: str | Path, duration: float, n: int = 6, workdir: Path |
                     lines.append(line.strip())
     return "\n".join(lines)
 
-
-# ============================================================================ analiza pliku
 
 def analyze_media(path: str | Path, audio_path: str | Path | None = None, *, asr: bool = True,
                   voice: bool = True, ocr: bool = True, fingerprints: bool = True) -> MediaFeatures:
@@ -484,7 +463,6 @@ def analyze_media(path: str | Path, audio_path: str | Path | None = None, *, asr
             except Exception as exc:
                 mf.errors.append(f"transkrypcja (Whisper): {exc.__class__.__name__}: {exc}")
 
-    # pewność: nagranie ekranu zawiera interfejs telefonu, mało mowy = słaby odcisk głosu
     conf = 1.0
     if mf.screen_recording:
         conf *= 0.8
@@ -495,8 +473,6 @@ def analyze_media(path: str | Path, audio_path: str | Path | None = None, *, asr
     mf.confidence = round(conf, 2)
     return mf
 
-
-# ============================================================================ wiele plików = jeden materiał
 
 def _combine(items: list[MediaFeatures], references: dict[str, np.ndarray] | None = None) -> dict[str, Any]:
     voices = [np.asarray(m.voice_emb) * max(1, m.voice_windows) for m in items if m.voice_emb]
@@ -569,8 +545,6 @@ def attach_to_incident(incident: Any, feats: dict[str, Any] | None) -> None:
         incident.save()
 
 
-# ============================================================================ głosy referencyjne
-
 _ref_cache: dict[str, np.ndarray] | None = None
 
 
@@ -629,8 +603,6 @@ def match_reference_voices(voice: list[float] | None, refs: dict[str, np.ndarray
     return [{"person": name, "similarity": round(s, 3)} for s, name in sims[:3] if s >= min_sim]
 
 
-# ============================================================================ porównanie
-
 def _cos(a: list[float] | None, b: list[float] | None) -> float | None:
     if not a or not b:
         return None
@@ -652,8 +624,6 @@ VOICE_LOW, VOICE_HIGH = 0.55, 0.80
 
 
 def _voice_score(cos: float | None) -> float | None:
-    # ECAPA na reklamach (muzyka w tle, kompresja): różni lektorzy wychodzą do ~0,5 (DANE/5 ~ DANE/14:
-    # 0,47), ten sam głos zwykle > 0,75, ten sam plik ~1,0. Poniżej 0,55 = brak sygnału.
     if cos is None:
         return None
     return round(float(np.clip((cos - VOICE_LOW) / (VOICE_HIGH - VOICE_LOW), 0, 1)), 3)
@@ -728,8 +698,6 @@ def compare(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
     conf = round(min(a.get("confidence", 0), b.get("confidence", 0)), 2) if strong else 0.0
     return {"signals": signals, "av_score": av_score, "confidence": conf, "reasons": reasons}
 
-
-# ============================================================================ CLI
 
 def _strip(feats: dict[str, Any]) -> dict[str, Any]:
     d = dict(feats)

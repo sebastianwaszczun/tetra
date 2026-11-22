@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
-# Parametry śledzące, które zmieniają się między kliknięciami tej samej reklamy
 TRACKING_PARAMS = {
     "gclid", "gclsrc", "dclid", "gbraid", "wbraid", "fbclid", "msclkid", "yclid", "ttclid",
     "twclid", "li_fat_id", "mc_cid", "mc_eid", "igshid", "_ga", "_gl",
@@ -43,7 +42,7 @@ def normalize_url(url: str) -> str:
     host = (parts.hostname or "").lower().removeprefix("www.")
     try:
         port = parts.port
-    except ValueError:      # „adres” z tekstu, np. „portal:internet” – port nie jest liczbą
+    except ValueError:
         port = None
     if port and port not in (80, 443):
         host = f"{host}:{port}"

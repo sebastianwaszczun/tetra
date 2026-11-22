@@ -1,5 +1,3 @@
-# Opcjonalnie, tylko na Linuksie/WSL2 z kartą NVIDIA i nvidia-container-toolkit:
-#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up -d --build
 services:
   app:
     build:

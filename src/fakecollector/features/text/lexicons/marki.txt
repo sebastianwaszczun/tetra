@@ -1,5 +1,3 @@
-# Marki, pod które podszywają się fałszywe reklamy (media, banki, instytucje, sklepy).
-# Format: Nazwa | wyrażenie regularne (małe litery)
 Gazeta.pl | gazeta\.pl|gazety\.pl
 TVN24 | tvn\s?24
 TVN | \btvn\b

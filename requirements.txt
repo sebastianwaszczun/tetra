@@ -1,51 +1,41 @@
-# --- Twarze ---
-insightface==0.7.3          # ArcFace embeddingi (512-d), detekcja twarzy
-onnxruntime>=1.17           # backend dla insightface (CPU)
-facetorch==0.6.2             # deepfake i emocje, zgodne z torch 2.3.1
+insightface==0.7.3
+onnxruntime>=1.17
+facetorch==0.6.2
 opencv-python-headless
-# MagFace nie ma pakietu pip – wagi pobiera scripts/image/pobierz_modele_obrazu.py
 
-# --- Obraz i szablon ---
-ImageHash                   # perceptual hash (pHash/dHash) – duplikaty kreacji
-open_clip_torch             # CLIP
-transformers>=4.40          # SigLIP
+ImageHash
+open_clip_torch
+transformers>=4.40
 Pillow
 
-# --- Tekst ---
-pytesseract                 # OCR (tesseract z pakietem pol)
-sentence-transformers       # embeddingi narracji (model wielojęzyczny, PL)
+pytesseract
+sentence-transformers
 
-# --- Głos ---
-speechbrain>=1.0            # ECAPA-TDNN: embeddingi mówcy (192-d), klonowany głos
+speechbrain>=1.0
 soundfile
 librosa
 
-# --- Infrastruktura / OSINT ---
 httpx
-apscheduler                 # harmonogram skanera Biblioteki Reklam
+apscheduler
 beautifulsoup4
 lxml
 tldextract
-dnspython                   # rekordy DNS
-python-whois                # WHOIS
-ipwhois                     # RDAP dla IP
-cryptography                # parsowanie certyfikatów
-mmh3                        # hash favicony (styl Shodan)
-playwright                  # łańcuchy przekierowań JS, HAR, zrzuty
+dnspython
+python-whois
+ipwhois
+cryptography
+mmh3
+playwright
 
-# --- Graf ---
-neo4j                       # sterownik Neo4j (kopia grafu do podglądu)
+neo4j
 
-# --- API ---
-fastapi                     # endpointy REST, dokumentacja /docs
-uvicorn[standard]           # serwer ASGI
-python-multipart            # przesyłanie plików do API (POST /analyze)
+fastapi
+uvicorn[standard]
+python-multipart
 
-# --- Bazy ---
 psycopg[binary]>=3.1
-pgvector                    # typ vector dla psycopg
+pgvector
 
-# --- Praca zespołowa ---
 pandas
 tqdm
 python-dotenv

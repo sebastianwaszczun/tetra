@@ -47,7 +47,6 @@ def compare(a: dict, b: dict, df: Counter | None = None) -> dict:
         r = rarity(df.get(key, 2))
         shared.append({**p, "rarity": round(r, 3), "contribution": round(p["weight"] * r, 3),
                        "description": WEIGHTS.get(p["kind"], (0, "", ""))[2]})
-    # rozmyte: szkielet DOM
     da = [p for p in a.get("pivots", []) if p["kind"] == "dom_simhash"]
     db = [p for p in b.get("pivots", []) if p["kind"] == "dom_simhash"]
     for x in da:
@@ -67,7 +66,7 @@ def compare(a: dict, b: dict, df: Counter | None = None) -> dict:
     identity = [s for s in shared if s["scope"] == "identity"]
     label = next(lbl for thr, lbl in LABELS if score >= thr)
     if label.startswith("duplikat") and not identity:
-        label = LABELS[1][1]       # bez wspólnej domeny/ID reklamy to nie duplikat, tylko ta sama kampania
+        label = LABELS[1][1]
     return {"a": a.get("record_id"), "b": b.get("record_id"), "score": round(score, 3), "label": label,
             "duplicate": bool(identity) and score >= 0.97,
             "scopes": sorted({s["scope"] for s in shared if s["contribution"] >= 0.3}),

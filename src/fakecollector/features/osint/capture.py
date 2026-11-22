@@ -35,15 +35,15 @@ class Resource:
     method: str = "GET"
     status: int | None = None
     mime: str = ""
-    resource_type: str = ""          # document / script / stylesheet / image / xhr / fetch / media / ...
-    headers: list[tuple[str, str]] = field(default_factory=list)   # nazwy małymi literami
+    resource_type: str = ""
+    headers: list[tuple[str, str]] = field(default_factory=list)
     body: bytes | None = None
     body_sha256: str | None = None
     size: int = 0
     ip: str | None = None
     redirect_url: str | None = None
     started: str | None = None
-    source: str = ""                 # skąd: har:<plik>, mhtml:<plik>, saved_files:<plik>, live
+    source: str = ""
     cookies: list[str] = field(default_factory=list)
 
     def header(self, name: str) -> str | None:
@@ -59,7 +59,7 @@ class Document:
     url: str | None
     html: str
     source: str
-    kind: str                        # har / saved_html / mhtml / live / dom
+    kind: str
 
 
 @dataclass
@@ -97,7 +97,6 @@ def _keep_body(mime: str, url: str) -> bool:
     return False
 
 
-# --------------------------------------------------------------------------- HAR
 def load_har(data: bytes, name: str) -> Capture:
     har = json.loads(data.decode("utf-8-sig", "replace"))
     log = har.get("log", har)
@@ -151,7 +150,6 @@ def load_har(data: bytes, name: str) -> Capture:
     return cap
 
 
-# --------------------------------------------------------------------------- HTML
 def load_html(data: bytes, name: str) -> Capture:
     html = data.decode("utf-8", "replace")
     m = _SAVED_FROM.search(html[:5000])
@@ -163,7 +161,6 @@ def load_html(data: bytes, name: str) -> Capture:
     return cap
 
 
-# --------------------------------------------------------------------------- MHTML
 def load_mhtml(data: bytes, name: str) -> Capture:
     msg = email.message_from_bytes(data, policy=email.policy.default)
     cap = Capture(inputs=[{"kind": "mhtml", "name": name, "sha256": sha256(data)}])
@@ -176,7 +173,7 @@ def load_mhtml(data: bytes, name: str) -> Capture:
         ctype = part.get_content_type()
         try:
             body = part.get_payload(decode=True) or b""
-        except Exception:  # noqa: BLE001 – uszkodzona część archiwum nie może wywrócić analizy
+        except Exception:  # noqa: BLE001
             continue
         if ctype == "text/html" and not cap.documents:
             cap.documents.append(Document(loc or cap.page_url, body.decode("utf-8", "replace"), f"mhtml:{name}", "mhtml"))
@@ -205,7 +202,6 @@ def _guess_type(mime: str, url: str) -> str:
     return "other"
 
 
-# --------------------------------------------------------------------------- manifest / yt-dlp
 def load_json(data: bytes, name: str) -> Capture | None:
     try:
         j = json.loads(data.decode("utf-8-sig", "replace"))
@@ -213,7 +209,7 @@ def load_json(data: bytes, name: str) -> Capture | None:
         return None
     if not isinstance(j, dict):
         return None
-    if "page_url" in j and "artifacts" in j:            # page-capture manifest
+    if "page_url" in j and "artifacts" in j:
         return Capture(page_url=j.get("page_url"), observed_at=j.get("captured_at"), title=j.get("title"),
                        streams=list(j.get("streams") or []),
                        inputs=[{"kind": "capture_manifest", "name": name, "tool": j.get("tool")}])
@@ -230,7 +226,6 @@ def load_json(data: bytes, name: str) -> Capture | None:
     return None
 
 
-# --------------------------------------------------------------------------- dispatcher
 def load_bytes(data: bytes, name: str) -> Capture | None:
     low = name.lower()
     if low.endswith(".har"):
@@ -277,12 +272,12 @@ def _load_tree(items: list[tuple[str, bytes]], label: str) -> Capture:
         parts = rel.replace("\\", "/").split("/")
         if any(p.endswith("_files") for p in parts[:-1]):
             if rel.lower().endswith((".html", ".htm")):
-                continue  # iframe'y/embed z _files – pomijamy, żeby nie mylić z głównym dokumentem
+                continue
             r = _saved_file_resource(data, rel)
             if r:
                 cap.resources.append(r)
             continue
-        if "/resources/" in "/" + "/".join(parts):   # page-capture: treść jest też w HAR
+        if "/resources/" in "/" + "/".join(parts):
             continue
         sub = load_bytes(data, rel)
         if sub:
@@ -310,7 +305,7 @@ def load_zip(data: bytes, name: str) -> Capture:
 
 def _zip_name(zi: zipfile.ZipInfo) -> str:
     n = zi.filename
-    if not zi.flag_bits & 0x800:       # bez flagi UTF-8 – próbujemy odzyskać polskie znaki
+    if not zi.flag_bits & 0x800:
         try:
             n = n.encode("cp437").decode("utf-8")
         except (UnicodeEncodeError, UnicodeDecodeError):
@@ -329,7 +324,7 @@ def load_dir(path: Path) -> Capture:
         rel = str(p.relative_to(path))
         in_files = any(x.endswith("_files") for x in p.parts)
         if p.suffix.lower() in _SKIP_EXT and not in_files:
-            continue  # zrzuty ekranu i wideo to robota innych modułów
+            continue
         if p.stat().st_size > config.MAX_UPLOAD_BYTES:
             continue
         items.append((rel, p.read_bytes()))

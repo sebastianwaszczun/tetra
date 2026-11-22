@@ -1,7 +1,3 @@
-// Dane z GET /graph -> węzły i krawędzie dla react-force-graph.
-// Ślady tego samego rodzaju łączące ten sam zestaw materiałów (np. 7 plików obrazu z dwóch stron)
-// stają się jednym węzłem z licznikiem – graf pokazuje powiązania, a nie listę hashy.
-
 const ENTITY = new Set(['domain', 'person', 'account', 'kit', 'infra'])
 const GROUPABLE = new Set(['account', 'kit', 'infra'])
 const ENTITY_EDGES = new Set(['uzywa', 'wymienia', 'pokazuje'])
@@ -17,7 +13,6 @@ export function prepareGraph(data, { hideTypes = [] } = {}) {
   const raw = data.nodes.filter((n) => !hidden.has(n.type))
   const byId = new Map(raw.map((n) => [n.id, n]))
 
-  // materiały, które wskazują na dany ślad
   const users = new Map()
   for (const e of data.edges) {
     if (!ENTITY_EDGES.has(e.type) || !byId.has(e.source) || !byId.has(e.target)) continue
@@ -25,7 +20,7 @@ export function prepareGraph(data, { hideTypes = [] } = {}) {
     users.get(e.target).add(e.source)
   }
 
-  const groupOf = new Map()       // id śladu -> id węzła grupy
+  const groupOf = new Map()
   const groups = new Map()
   for (const n of raw) {
     if (!GROUPABLE.has(n.type)) continue
@@ -68,7 +63,6 @@ export function prepareGraph(data, { hideTypes = [] } = {}) {
   return { nodes, links }
 }
 
-// Węzeł / krawędź w formacie panelu „dlaczego” (ten sam co wcześniej).
 export function asSelection(obj, isLink) {
   if (isLink) {
     return {
@@ -83,7 +77,6 @@ export function asSelection(obj, isLink) {
   }
 }
 
-// Łagodne przyciąganie do środka: rozłączne kampanie (pojedyncze materiały) nie odlatują poza kadr.
 export function gravity(k = 0.06) {
   let nodes = []
   const force = (alpha) => {

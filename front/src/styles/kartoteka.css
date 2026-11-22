@@ -1,6 +1,3 @@
-/* Widoki kartoteki: przegląd kampanii, kampania, operator, materiał, wynik sprawdzenia.
-   Ten sam język co strona główna: papier, obrys „tuszem” (.ink), kreskowany cień (.hatch), czerwony akcent. */
-
 :root {
   --ink: #161412;
   --paper: #F3EBDC;
@@ -17,7 +14,6 @@
 .nl.active .nh { opacity: .5; }
 .nl.active .ink { border-width: 2.6px; }
 
-/* ---------------------------------------------------------------- układ */
 .view-main { align-items: stretch; text-align: left; padding-top: 40px; }
 .view { width: 100%; }
 .view section { margin-top: 8px; }
@@ -40,13 +36,11 @@
 .small { font-size: 15px; color: var(--soft); }
 .mono { font-family: 'Courier New', monospace; font-size: 14px; overflow-wrap: anywhere; }
 
-/* ---------------------------------------------------------------- pudełko z obrysem i cieniem */
 .box { position: relative; z-index: 0; box-sizing: border-box; }
 .box::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--paper); border-radius: var(--radius); }
 .box > .ink { border-width: 2px; }
 .box-hatch.hatch { z-index: -2; left: 8px; top: 8px; height: 100%; transition: none; }
 
-/* ---------------------------------------------------------------- drobne elementy */
 .chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .chip-s { display: inline-block; padding: 0 10px; border: 1.6px solid var(--ink); border-radius: var(--radius-s); font-size: 16px; line-height: 1.6; background: var(--paper-hi); max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .chip-s.mono { font-size: 13px; line-height: 1.9; }
@@ -82,7 +76,6 @@
 .btn:focus-visible, .link-btn:focus-visible, .toggle:focus-visible, .tab:focus-visible { outline: 2px dashed var(--ink); outline-offset: 4px; }
 .link-btn { min-height: 42px; padding: 0 6px; border: 0; background: transparent; font-family: 'Patrick Hand', cursive; font-size: 18px; color: var(--ink); cursor: pointer; text-decoration: underline wavy; text-underline-offset: 6px; }
 
-/* ---------------------------------------------------------------- przegląd */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 22px; margin: 8px 0 30px; }
 .stat { display: flex; flex-direction: column; padding: 14px 18px 12px; }
 .stat-num { font-family: 'Gloria Hallelujah', cursive; font-size: 40px; line-height: 1.1; }
@@ -117,7 +110,6 @@
 .feed-text { margin: 8px 0; font-size: 16px; line-height: 1.35; color: #3b3630; }
 .feed-links { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; font-size: 16px; }
 
-/* ---------------------------------------------------------------- graf */
 .graph { position: relative; z-index: 0; }
 .graph-frame { width: 100%; }
 .graph-frame::before { background: var(--paper-hi); }
@@ -128,7 +120,6 @@
 .legend-item { display: inline-flex; align-items: center; gap: 6px; }
 .sw-edge { display: inline-block; width: 28px; }
 
-/* ---------------------------------------------------------------- panel „dlaczego” */
 .panel { padding: 20px 22px 18px; }
 .panel-title { margin: 0 0 8px; font-family: 'Gloria Hallelujah', cursive; font-weight: 400; font-size: 22px; }
 .panel-sub { margin: 16px 0 6px; font-family: 'Gloria Hallelujah', cursive; font-weight: 400; font-size: 17px; }
@@ -158,7 +149,6 @@
 .decision.compact .btn { min-height: 36px; padding: 0 12px; font-size: 14px; }
 .note-input { width: 100%; box-sizing: border-box; min-height: 40px; margin-top: 4px; padding: 0 12px; border: 0; border-bottom: 2px dashed var(--ink); background: transparent; font-family: 'Patrick Hand', cursive; font-size: 18px; outline: none; }
 
-/* ---------------------------------------------------------------- kampania */
 .table { position: relative; z-index: 0; display: flex; flex-direction: column; gap: 14px; }
 .trow { display: grid; grid-template-columns: minmax(0, 1fr) 190px 210px 100px auto; align-items: center; gap: 8px 16px; padding: 12px 18px; }
 .trow-title { overflow-wrap: anywhere; font-size: 18px; }
@@ -167,7 +157,6 @@
 .links { position: relative; z-index: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 22px; }
 .link-card { padding: 14px 18px; }
 
-/* ---------------------------------------------------------------- materiał */
 .sheet { padding: 20px 22px; }
 .text-preview { margin: 0; max-height: 320px; overflow: auto; white-space: pre-wrap; font-size: 17px; line-height: 1.45; }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; }
@@ -179,7 +168,6 @@
 .mod.bad { color: var(--red); }
 .mod.mute { color: var(--muted); }
 
-/* ---------------------------------------------------------------- wynik sprawdzenia (strona główna) */
 .result-wrap { position: relative; z-index: 0; margin-top: 44px; }
 .result { padding: 26px 30px 24px; }
 .result-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; }
@@ -200,7 +188,6 @@
   .split > div { min-width: 0; }
 }
 
-/* ---------------------------------------------------------------- graf (force-graph + Rough.js) */
 .graph-canvas canvas { display: block; }
 .graph-frame.dark::before { background: #1d1a17; }
 .graph-fit.light { background: #1d1a17; color: #F3EBDC; }

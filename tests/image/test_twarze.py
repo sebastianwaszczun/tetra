@@ -114,7 +114,6 @@ def test_ostrosc_wyrownanego_wzoru_jest_stabilna_w_roznych_rozmiarach() -> None:
         ostre.append(ostrosc_twarzy(wyrownana))
         rozmyte.append(ostrosc_twarzy(wyrownaj_twarz(rozmyty, punkty)))
 
-    # Maksymalny rozrzut wynosi 10% najmniejszego pomiaru tego samego wzoru.
     assert max(ostre) <= min(ostre) * 1.10
     assert all(slaba < 0.5 * ostra for ostra, slaba in zip(ostre, rozmyte, strict=True))
 

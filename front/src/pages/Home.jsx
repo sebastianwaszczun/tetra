@@ -97,8 +97,6 @@ const CARDS = [
   },
 ]
 
-// Strona główna: wyszukiwarka z kotem detektywem i wynik sprawdzenia. Zostaje zamontowana także na innych
-// widokach (ukryta), żeby wynik i dodane pliki nie znikały po przejściu do kartoteki i z powrotem.
 export default function Home({ hidden = false }) {
   const [outcome, setOutcome] = useState(null)
   const [q, setQ] = useState('')

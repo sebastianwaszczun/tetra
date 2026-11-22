@@ -43,7 +43,6 @@ def main(argv: list[str] | None = None) -> None:
 
     h = skaner.cfg["harmonogram"]
     plan = BlockingScheduler(timezone="Europe/Warsaw")
-    # Czas ze strefą: kontener działa w UTC, a harmonogram w czasie polskim.
     teraz = datetime.now(timezone.utc)
     start = teraz + timedelta(seconds=30) if h["skan_przy_starcie"] else None
     wspolne = {"max_instances": 1, "coalesce": True, "misfire_grace_time": 600}

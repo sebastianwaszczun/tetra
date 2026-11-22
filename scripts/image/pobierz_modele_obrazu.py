@@ -14,17 +14,16 @@ SIGLIP_REPO = "timm/ViT-B-16-SigLIP2"
 MAGFACE_URL = (
     "https://drive.usercontent.google.com/download"
     "?id=1Bd87admxOZvbIOAyTkGEntsEz3fyMt7H&export=download&confirm=t"
-)  # IrvingMeng/MagFace, Model Zoo, iResNet100 MS1MV2 (DDP)
+)
 MAGFACE_SHA256 = "cfeba792dada6f1f30d1e118aff077d493dd95dd76c77c30f57f90fd0164ad58"
 FACETORCH_GDRIVE = {
-    # Oficjalne pliki *_gdrive.yaml z wydania facetorch 0.6.2 na PyPI.
     "deepfake.pt": "1GjDTwQpvrkCjXOdiBy1oMkzm7nt-bXFg",
     "fer.pt": "1i5f8vy1dZv_u8vsJsj9CHEzHwsokIknr",
 }
 FACETORCH_SHA256 = {
     "deepfake.pt": "e36197ae83fa7c050e8ceba267a1f028f2d74d8ad805bf5d5037a26e8ca96c13",
     "fer.pt": "39d8046b1fe3eb06d5edb094307f0cd465a40b7f8886d4b477ca4bbaf7cbb62e",
-}  # Sums for exactly the same TorchScript artifacts in the official model cards.
+}
 BUFFALO_URL = "https://github.com/deepinsight/insightface/releases/download/v0.7/buffalo_l.zip"
 BUFFALO_PLIKI = ("det_10g.onnx", "w600k_r50.onnx")
 OPENCV_PLIKI = {

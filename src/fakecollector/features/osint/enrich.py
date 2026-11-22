@@ -21,7 +21,6 @@ from . import config
 from .utils import is_public_ip, split_host
 
 
-# --------------------------------------------------------------------------- cache
 def _cache_path(kind: str, key: str) -> Path:
     h = hashlib.sha1(key.encode()).hexdigest()
     return config.CACHE_DIR / kind / f"{h}.json"
@@ -35,7 +34,7 @@ def cached(kind: str, key: str, fn):
     except (OSError, json.JSONDecodeError):
         pass
     val = fn()
-    if val is not None and not (isinstance(val, dict) and val.get("error")):   # błędów nie cache'ujemy
+    if val is not None and not (isinstance(val, dict) and val.get("error")):
         try:
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(json.dumps(val, default=str))
@@ -48,7 +47,6 @@ def _err(e: Exception) -> dict:
     return {"error": f"{type(e).__name__}: {str(e)[:200]}"}
 
 
-# --------------------------------------------------------------------------- DNS
 def dns_lookup(host: str) -> dict:
     def run():
         r = dns.resolver.Resolver()
@@ -82,7 +80,6 @@ def dns_lookup(host: str) -> dict:
         return _err(e)
 
 
-# --------------------------------------------------------------------------- RDAP / WHOIS
 def _vcard_get(entity: dict, field: str) -> str | None:
     for item in (entity.get("vcardArray") or [None, []])[1]:
         if item and item[0] == field:
@@ -131,7 +128,7 @@ def _parse_rdap(j: dict) -> dict:
 
 
 def _whois_fallback(domain: str) -> dict:
-    import whois  # python-whois
+    import whois
     w = whois.whois(domain)
 
     def first(v):
@@ -177,7 +174,6 @@ def rdap_domain(domain: str) -> dict:
     return cached("rdap", domain, run)
 
 
-# --------------------------------------------------------------------------- IP -> ASN
 def ip_info(ip: str) -> dict:
     if not is_public_ip(ip):
         return {"ip": ip, "error": "adres niepubliczny"}
@@ -208,7 +204,6 @@ def reverse_dns(ip: str) -> str | None:
     return (cached("ptr", ip, run) or {}).get("ptr")
 
 
-# --------------------------------------------------------------------------- TLS
 def tls_cert(host: str, port: int = 443) -> dict:
     def run():
         from cryptography import x509
@@ -247,7 +242,6 @@ def tls_cert(host: str, port: int = 443) -> dict:
     return cached("tls", f"{host}:{port}", run)
 
 
-# --------------------------------------------------------------------------- Certificate Transparency
 def crtsh(domain: str) -> dict:
     def run():
         try:
@@ -275,7 +269,6 @@ def crtsh(domain: str) -> dict:
     return cached("crtsh", domain, run)
 
 
-# --------------------------------------------------------------------------- favicon
 def favicon_hashes(data: bytes) -> dict:
     """mmh3 w wariancie Shodana (base64 z łamaniem linii) – można od razu szukać w Shodan/Censys:
     http.favicon.hash:<mmh3>."""
@@ -303,7 +296,6 @@ def fetch_favicon(host: str, refs: list[str]) -> dict | None:
     return cached("favicon", host, run)
 
 
-# --------------------------------------------------------------------------- stan domeny
 _PARKING_NS = ("dyna-ns.net", "registrar-servers.com", "sedoparking.com", "bodis.com", "parkingcrew.net",
                "above.com", "dan.com", "afternic.com", "suspended-domain", "namebrightdns.com",
                "domaincontrol.com", "parklogic.com", "uniregistrymarket.link", "huge-domains.com")
@@ -327,7 +319,7 @@ def domain_flags(dns_rec: dict | None, rdap: dict | None, tls: dict | None, host
         flags.append("nxdomain")
     st = " ".join(r.get("status") or []).lower()
     if "hold" in st:
-        flags.append("on_hold")              # clientHold/serverHold – zawieszona (często po zgłoszeniu)
+        flags.append("on_hold")
     if "pending delete" in st or "redemption" in st:
         flags.append("pending_delete")
     ns = " ".join((r.get("nameservers") or []) + (d.get("ns") or []))
@@ -343,7 +335,6 @@ def domain_flags(dns_rec: dict | None, rdap: dict | None, tls: dict | None, host
     return flags
 
 
-# --------------------------------------------------------------------------- pomocnicze
 def domain_age_days(created: str | None, at: str | None) -> int | None:
     if not created:
         return None

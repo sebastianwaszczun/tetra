@@ -75,7 +75,6 @@ class Skaner:
         return cls(cfg, magazyn, klient, analizator, lambda: Przechwyt(zrzuty_token, cfg["przechwyt"], katalog),
                    katalog)
 
-    # ------------------------------------------------------------------ skan
     def skanuj(self, wyzwalacz: str = "harmonogram", fraza: str | None = None,
                limit: int | None = None) -> dict[str, Any]:
         with self.magazyn.blokada() as wolne:
@@ -214,7 +213,6 @@ class Skaner:
         log.info("Ponowna analiza: %s z %s", udane, len(wiersze))
         return {"status": "zakonczony", "do_ponowienia": len(wiersze), "przeanalizowanych": udane, "bledy": bledy}
 
-    # ------------------------------------------------------------------ zadania dobowe
     def sprawdz_zdjete(self) -> dict[str, Any]:
         """Czy Meta zdjęła przeanalizowane reklamy. Pojedynczej reklamy nie da się odczytać po id,
         więc pytamy o strony (do 10 na wywołanie) i szukamy naszych reklam w wynikach."""

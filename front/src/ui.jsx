@@ -19,7 +19,7 @@ export const PERSUASION = {
 
 export const SIGNALS = { text: 'tekst', osint: 'OSINT', image: 'obraz', av: 'wideo' }
 
-export function Ink({ double = false }) {
+function Ink({ double = false }) {
   return (
     <>
       <span className="ink" aria-hidden="true" />
@@ -114,7 +114,7 @@ export function ago(iso) {
   return d === 1 ? 'wczoraj' : `${d} dni temu`
 }
 
-export const plural = (n, one, few, many) => {
+const plural = (n, one, few, many) => {
   const d = n % 10, dd = n % 100
   return n === 1 ? one : d >= 2 && d <= 4 && (dd < 12 || dd > 14) ? few : many
 }

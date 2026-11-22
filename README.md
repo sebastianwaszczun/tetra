@@ -19,6 +19,7 @@ wejście ─► preprocessing ─► moduły cech ─► rekord materiału ─�
 | Rekord materiału | `src/fakecollector/record/` | wszystkie moduły → jeden rekord → Postgres (pgvector) → wyszukiwanie podobnych |
 | Grupowanie | `src/fakecollector/grouping/` | porównanie par modułami, kampanie i operatorzy, przesłanki |
 | Graf | `src/fakecollector/graph/` | graf powiązań dla frontu (`/graph`) i kopia w Neo4j |
+| Ewaluacja | `src/fakecollector/eval/` | jakość grupowania względem etykiet: pary (precyzja, czułość, F1), ARI, przypisywanie nowych materiałów, ablacja modułów, dobór progu |
 | API | `src/fakecollector/api/main.py` | FastAPI, dokumentacja: http://localhost:8000/docs |
 | Front | `front/` | React (Vite), http://localhost:5173 |
 
@@ -87,6 +88,7 @@ npm run dev                               # http://localhost:5173 (adres API: VI
 | `GET /graph` (`?campaign_id=`, `?operator=`, `?material_id=`) | graf `{nodes, edges, stats, legend}` dla Cytoscape / vis-network / react-force-graph |
 | `GET /compare?a=&b=` | porównanie dwóch materiałów wszystkimi modułami |
 | `POST /campaigns/rebuild`, `POST /graph/sync` | przeliczenie kampanii, kopia grafu w Neo4j |
+| `GET /eval` (`?markdown=true`), `POST /eval/run` | raport jakości grupowania / uruchomienie ewaluacji |
 | `POST /text/analyze`, `/image/analyze`, `/image/compare`, `/av/compare` | pojedyncze moduły (do testów) |
 
 `POST /analyze` trwa od kilku sekund do 1–2 minut (OSINT z DNS/WHOIS, modele obrazu, transkrypcja filmu) –
@@ -112,6 +114,29 @@ Nawrocki (p8, p11) oraz osobne kampanie Olejnik, „37 minut po emisji” i Glow
 operatorem (ten sam Pixel Meta i serwer aktora). Drugi operator: suplementy Kardivix, Metabo RX, Uromexil
 i biała strona „Cactus Recipe”.
 
+## Ewaluacja
+
+Sprawdza, jak dobrze grupowanie odtwarza kampanie przypisane ręcznie w `data/labels.csv`
+(kolumny: `source`, `kampania`, `operator`, `sprawdzone`, `uwagi`).
+
+```bash
+docker compose exec app python -m fakecollector.eval labels    # szkic etykiet z obecnych kampanii
+#   → przejrzyj data/labels.csv: popraw „kampania” tam, gdzie system się mylił, wpisz „tak” w „sprawdzone”
+docker compose exec app python -m fakecollector.eval run       # raport: data/eval/raport.md i raport.json
+```
+
+| Co mierzymy | Jak | Punkt walidacji z zadania |
+|---|---|---|
+| Jakość grupowania | pary materiałów: precyzja, czułość, F1; ARI podziału | identyfikowanie wariantów tej samej kampanii |
+| Nowy materiał | „wyjmij jeden”: każdy materiał udaje nowy i jest przypisywany do reszty bazy | przypisywanie nowych materiałów do istniejących grup |
+| Nowa kampania | „wyjmij kampanię”: cała kampania udaje nieznaną – nie może się dokleić | materiały, które nie powinny zostać połączone |
+| Ablacja | wynik bez każdego modułu i z samym modułem | przydatność cech; odporność na brak strony / nagrania |
+| Dobór progu | F1 i ARI dla progów 0.50–0.95 | uzasadnienie progu 0.75 |
+
+Wyniki par są zapisywane w `data/eval/pary.json`, więc kolejne uruchomienia (np. po poprawie etykiet)
+trwają sekundy; `--fresh` porównuje od nowa (po zmianie modułów lub bazy). Szkic etykiet to kopia wyniku
+systemu – dopóki wiersze nie są sprawdzone, raport ostrzega, że metryki są zawyżone.
+
 ## Narzędzia wiersza poleceń (w kontenerze `app`)
 
 ```bash
@@ -121,6 +146,7 @@ python -m fakecollector.features.av data/DANE/5 data/DANE/14 --compare
 python -m fakecollector.record list | show <id> | candidates <id>
 python -m fakecollector.grouping campaigns | show <nr> | compare <id_a> <id_b> | assign <id>
 python -m fakecollector.graph stats | export data/graf.json | sync
+python -m fakecollector.eval labels | run [--fresh] | show
 python scripts/smoke_test.py [--fast] [--enrich]                     # test całego potoku
 ```
 

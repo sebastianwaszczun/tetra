@@ -437,6 +437,23 @@ def _():
     return detail
 
 
+
+@check("ewaluacja", "metryki (ARI, pary) i ocena przypisywania na przykładzie")
+def _():
+    from fakecollector.eval import metrics
+    from fakecollector.eval.run import MODULE_NAMES, Pair, _getter, evaluate
+    gold = {"a": 1, "b": 1, "c": 2, "d": 2, "e": 3}
+    assert metrics.adjusted_rand(gold, gold) == 1.0
+    assert metrics.adjusted_rand({k: k for k in gold}, gold) == 0.0
+    pairs = {("a", "b"): Pair("a", "b", contrib={"text": 0.9}),
+             ("c", "d"): Pair("c", "d", contrib={"osint": 0.8}),
+             ("b", "e"): Pair("b", "e", contrib={"image": 0.3})}
+    r = evaluate(list(gold), gold, _getter(pairs, frozenset(MODULE_NAMES)), 0.75)
+    assert r["pairs"]["f1"] == 1.0 and r["assign_known"]["accuracy"] == 1.0 and r["assign_new"]["accuracy"] == 1.0, r
+    no_text = evaluate(list(gold), gold, _getter(pairs, frozenset(MODULE_NAMES) - {"text"}), 0.75)
+    assert no_text["pairs"]["recall"] == 0.5, no_text["pairs"]
+    return "ARI, F1, „wyjmij jeden” i ablacja liczą się poprawnie"
+
 # ============================================================================ API
 print("\nAPI")
 

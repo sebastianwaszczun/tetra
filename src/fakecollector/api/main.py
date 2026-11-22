@@ -483,3 +483,26 @@ def stats() -> dict[str, Any]:
         raise HTTPException(503, f"Baza niedostępna: {exc.__class__.__name__}: {exc}") from exc
     keys = ("materials", "campaigns", "single_material_campaigns", "operators", "to_review", "unassigned", "domains")
     return dict(zip(keys, row))
+
+# ----------------------------------------------------------------------------- ewaluacja
+
+@app.get("/eval", tags=["ewaluacja"], summary="Ostatni raport jakości grupowania (metryki, ablacja, progi)")
+def eval_report(markdown: bool = False) -> Any:
+    """Raport z `python -m fakecollector.eval run` albo `POST /eval/run`. `markdown=true` – gotowa tabela."""
+    from fakecollector import eval as eval_module
+    report = eval_module.last_report()
+    if report is None:
+        raise HTTPException(404, "Brak raportu – uruchom POST /eval/run (wymaga data/labels.csv).")
+    return {"markdown": eval_module.to_markdown(report)} if markdown else report
+
+
+@app.post("/eval/run", tags=["ewaluacja"], summary="Uruchom ewaluację na materiałach z etykietami")
+def eval_run(fresh: bool = False, threshold: Optional[float] = None) -> dict[str, Any]:
+    """Porównuje wszystkie pary materiałów z etykietami (data/labels.csv), liczy precyzję/czułość/F1 par,
+    ARI, przypisywanie nowych materiałów, ablację modułów i przegląd progów. Pierwsze uruchomienie trwa
+    kilka minut (porównania), kolejne – sekundy (wyniki par są zapisane; `fresh=true` liczy od nowa)."""
+    from fakecollector import eval as eval_module
+    try:
+        return eval_module.run(threshold=threshold, fresh=fresh)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
